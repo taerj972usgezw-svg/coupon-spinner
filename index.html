@@ -100,6 +100,15 @@
             <!-- 관리자 모드 표시 -->
             <span class="admin-unlimited-pill" id="adminUnlimitedBadge" style="display:none;">👑 관리자 무제한 스핀 활성화</span>
           </div>
+
+          <!-- 비로그인 시 즉시 눈에 띄는 가입/로그인 유도 박스 -->
+          <div class="chance-auth-prompt" id="chanceAuthPrompt">
+            <span>👋 로그인하시면 24시간마다 3회 무료 스핀이 지급됩니다!</span>
+            <div class="chance-auth-btns">
+              <button type="button" class="btn-prompt-login" onclick="openLoginModal()">로그인</button>
+              <button type="button" class="btn-prompt-register" onclick="openRegisterModal()">3초 회원가입</button>
+            </div>
+          </div>
         </div>
 
         <div class="quick-tags">
@@ -522,6 +531,6 @@
   <div class="toast-popup" id="toastPopup"></div>
 
   <!-- JS 로드 -->
-  <script src="script.js?v=5.0.0"></script>
+  <script src="script.js?v=5.1.0"></script>
 </body>
 </html>
