@@ -19,9 +19,13 @@ const morgan  = require('morgan');
 const path    = require('path');
 const fs      = require('fs');
 const http    = require('http');
+const https   = require('https');
+const { URL } = require('url');
 const NodeCache = require('node-cache');
 const { v4: uuidv4 } = require('uuid');
 const winston = require('winston');
+
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || 'https://discord.com/api/webhooks/1546893744412950588/E3Tquk7hSu_p9MOKhgg7E6XIl2X7xfKKadTKQEVvDYuz3NFAJEkK47QNqFGE8SjVY4yx';
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '80', 10);
@@ -372,6 +376,193 @@ app.get('/api/stats', apiLimiter, (req, res) => {
     memory: process.memoryUsage()
   });
 });
+
+// ════════════════════════════════════════
+//  디스코드 웹훅 알림 전송 함수
+// ════════════════════════════════════════
+function sendDiscordWebhook(payload) {
+  if (!DISCORD_WEBHOOK_URL) return;
+
+  try {
+    const parsedUrl = new URL(DISCORD_WEBHOOK_URL);
+    const postData = JSON.stringify(payload);
+
+    const options = {
+      hostname: parsedUrl.hostname,
+      port: 443,
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        'User-Agent': 'CouponMoa-Tracker/1.0'
+      },
+      timeout: 5000
+    };
+
+    const req = https.request(options, (res) => {
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        logger.warn(`⚠️ 디스코드 웹훅 전송 상태 코드: ${res.statusCode}`);
+      }
+    });
+
+    req.on('error', (err) => {
+      logger.error('⚠️ 디스코드 웹훅 요청 오류:', err.message);
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      logger.warn('⚠️ 디스코드 웹훅 요청 시간 초과');
+    });
+
+    req.write(postData);
+    req.end();
+  } catch (err) {
+    logger.error('⚠️ 디스코드 웹훅 전송 실패:', err.message);
+  }
+}
+
+// 방문자 기록 쿨다운 (동일 IP는 3분 동안 1회만 알림 - 웹훅 도배 방지)
+const visitAlertCache = new NodeCache({ stdTTL: 180, checkperiod: 60 });
+
+// 방문자 정보 수집 및 디스코드 웹훅 발송 API
+app.post('/api/track-visit', (req, res) => {
+  try {
+    // 1. 실제 클라이언트 IP 추출 (프록시/Cloudflare/Railway 등)
+    const rawIp = (
+      req.headers['cf-connecting-ip'] ||
+      req.headers['x-real-ip'] ||
+      (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : null) ||
+      req.ip ||
+      req.connection?.remoteAddress ||
+      '알 수 없음'
+    ).replace(/^::ffff:/, '');
+
+    // 동일 IP 3분 쿨다운 체크
+    const cooldownKey = `visit_${rawIp}`;
+    if (visitAlertCache.has(cooldownKey)) {
+      return res.json({ success: true, cached: true });
+    }
+    visitAlertCache.set(cooldownKey, true);
+
+    // 2. 브라우저/클라이언트에서 전달받은 정보
+    const clientData = req.body || {};
+    const screenRes = clientData.screen || '알 수 없음';
+    const language  = clientData.language || req.headers['accept-language']?.split(',')[0] || 'ko-KR';
+    const referrer  = clientData.referrer || req.headers['referer'] || '직접 방문 (주소창 입력/즐겨찾기)';
+    const currentUrl = clientData.url || `http://${req.headers.host || 'www.쿠폰.온라인.한국'}${req.originalUrl}`;
+    const ua = req.headers['user-agent'] || '알 수 없음';
+
+    // 3. 간이 기기 / OS / 브라우저 파싱
+    let deviceType = '💻 PC / 데스크톱';
+    if (/iphone/i.test(ua)) deviceType = '📱 iPhone';
+    else if (/ipad/i.test(ua)) deviceType = '📟 iPad';
+    else if (/android/i.test(ua)) {
+      deviceType = /mobile/i.test(ua) ? '📱 Android 스마트폰' : '📟 Android 태블릿';
+    }
+
+    let os = '기타 OS';
+    if (/windows/i.test(ua)) os = '🪟 Windows';
+    else if (/macintosh|mac os x/i.test(ua)) os = '🍎 macOS';
+    else if (/iphone|ipad|ipod/i.test(ua)) os = '🍎 iOS';
+    else if (/android/i.test(ua)) os = '🤖 Android';
+    else if (/linux/i.test(ua)) os = '🐧 Linux';
+
+    let browser = '기타 브라우저';
+    if (/kakaotalk/i.test(ua)) browser = '🟡 카카오톡 인앱 브라우저';
+    else if (/naver/i.test(ua)) browser = '🟢 네이버 인앱 브라우저';
+    else if (/samsungbrowser/i.test(ua)) browser = '🌌 삼성 인터넷';
+    else if (/edg\//i.test(ua)) browser = '🌊 Microsoft Edge';
+    else if (/chrome/i.test(ua) && !/edg\//i.test(ua)) browser = '🌐 Google Chrome';
+    else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = '🧭 Apple Safari';
+    else if (/firefox/i.test(ua)) browser = '🦊 Mozilla Firefox';
+
+    // 한국 표준시 (KST, UTC+9)
+    const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000)
+      .toISOString()
+      .replace('T', ' ')
+      .replace(/\..+/, '') + ' (KST)';
+
+    // 4. 디스코드 임베드 생성
+    const embedPayload = {
+      username: '쿠폰모아 방문자 알리미',
+      avatar_url: 'https://cdn-icons-png.flaticon.com/512/879/879757.png',
+      embeds: [
+        {
+          title: '🚨 신규 방문자 접속 알림!',
+          description: `방문자가 **쿠폰모아(룰렛 이벤트)** 사이트에 접속했습니다.`,
+          color: 0xFF5722, // 주황색
+          fields: [
+            {
+              name: '🌐 접속 IP 주소',
+              value: `\`${rawIp}\``,
+              inline: true
+            },
+            {
+              name: '📱 기기 분류',
+              value: deviceType,
+              inline: true
+            },
+            {
+              name: '💻 OS 및 환경',
+              value: os,
+              inline: true
+            },
+            {
+              name: '🧭 브라우저',
+              value: browser,
+              inline: true
+            },
+            {
+              name: '🖥️ 화면 해상도',
+              value: `\`${screenRes}\``,
+              inline: true
+            },
+            {
+              name: '🗣️ 기본 언어',
+              value: `\`${language}\``,
+              inline: true
+            },
+            {
+              name: '🔗 접속 경로 (Referrer)',
+              value: referrer.length > 250 ? referrer.substring(0, 250) + '...' : referrer,
+              inline: false
+            },
+            {
+              name: '📍 접속 페이지',
+              value: currentUrl.length > 250 ? currentUrl.substring(0, 250) + '...' : currentUrl,
+              inline: false
+            },
+            {
+              name: '⏰ 접속 일시',
+              value: `\`${nowKST}\``,
+              inline: false
+            },
+            {
+              name: '🔍 User-Agent 원본',
+              value: '```' + (ua.length > 200 ? ua.substring(0, 200) + '...' : ua) + '```',
+              inline: false
+            }
+          ],
+          footer: {
+            text: '쿠폰모아 실시간 방문자 트래커 v1.0 • Railway 배포'
+          },
+          timestamp: new Date().toISOString()
+        }
+      ]
+    };
+
+    // 비동기 발송
+    sendDiscordWebhook(embedPayload);
+    logger.info(`🔔 방문자 웹훅 발송: IP=${rawIp} OS=${os} Browser=${browser}`);
+
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('방문자 추적 실패:', err);
+    res.status(500).json({ error: '추적 실패' });
+  }
+});
+
 
 // ════════════════════════════════════════
 //  404 핸들러
