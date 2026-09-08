@@ -629,6 +629,34 @@ function bindAllClickEvents() {
   bindElementAction('btnAdminCloseBottom', () => closeAdminModal());
   bindElementAction('btnAdminRecharge', () => adminRechargeUserSpins());
   bindElementAction('btnAdminRefresh', () => loadAdminUserList());
+
+  // 모달 바깥 배경 터치/클릭 시 닫기
+  ['loginModal', 'registerModal', 'adminModal', 'winModal'].forEach(modalId => {
+    const m = document.getElementById(modalId);
+    if (m) {
+      m.addEventListener('click', (e) => {
+        if (e.target === m) {
+          m.classList.remove('active');
+          document.body.style.overflow = '';
+        }
+      });
+    }
+  });
+
+  // 엔터 키로 간편 로그인/가입
+  const bindEnter = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') fn();
+      });
+    }
+  };
+  bindEnter('loginUsername', submitLogin);
+  bindEnter('loginPassword', submitLogin);
+  bindEnter('regUsername', submitRegister);
+  bindEnter('regName', submitRegister);
+  bindEnter('regPassword', submitRegister);
 }
 
 function bindElementAction(elemId, handler) {
@@ -638,10 +666,6 @@ function bindElementAction(elemId, handler) {
     if (e) e.stopPropagation();
     handler();
   };
-  el.addEventListener('touchend', (e) => {
-    if (e) e.stopPropagation();
-    handler();
-  }, { passive: true });
 }
 
 // ── 9. 스핀 회전 로직 ──
@@ -1272,7 +1296,13 @@ function showToast(msg) {
 // ── 18. 회원가입 / 로그인 / 최고관리자 모달 & API 연동 ──
 function openLoginModal() {
   const m = document.getElementById('loginModal');
-  if (m) m.classList.add('active');
+  if (m) {
+    m.classList.add('active');
+    setTimeout(() => {
+      const u = document.getElementById('loginUsername');
+      if (u) u.focus();
+    }, 120);
+  }
   document.body.style.overflow = 'hidden';
 }
 
@@ -1284,7 +1314,13 @@ function closeLoginModal() {
 
 function openRegisterModal() {
   const m = document.getElementById('registerModal');
-  if (m) m.classList.add('active');
+  if (m) {
+    m.classList.add('active');
+    setTimeout(() => {
+      const u = document.getElementById('regUsername');
+      if (u) u.focus();
+    }, 120);
+  }
   document.body.style.overflow = 'hidden';
 }
 
