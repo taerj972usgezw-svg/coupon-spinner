@@ -39,8 +39,8 @@
       <div class="header-right">
         <!-- 로그인 안 된 상태 버튼들 -->
         <div id="guestActionGroup" class="auth-btn-group">
-          <button class="btn-auth-login" onclick="openLoginModal()">로그인</button>
-          <button class="btn-auth-register" onclick="openRegisterModal()">회원가입</button>
+          <button type="button" id="btnHeaderLogin" class="btn-auth-login" onclick="openLoginModal()">로그인</button>
+          <button type="button" id="btnHeaderRegister" class="btn-auth-register" onclick="openRegisterModal()">회원가입</button>
         </div>
 
         <!-- 로그인 된 상태 프로필 및 관리자 버튼 -->
@@ -50,13 +50,13 @@
             <span class="user-name-text" id="userNameText">사용자</span>
           </div>
           <!-- 관리자 전용 버튼 (일반 회원에게는 절대 안 보임) -->
-          <button class="btn-admin-panel" id="btnAdminPanel" style="display:none;" onclick="openAdminModal()">
+          <button type="button" class="btn-admin-panel" id="btnAdminPanel" style="display:none;" onclick="openAdminModal()">
             👑 관리자 대시보드
           </button>
-          <button class="btn-auth-logout" onclick="logoutUser()">로그아웃</button>
+          <button type="button" id="btnLogout" class="btn-auth-logout" onclick="logoutUser()">로그아웃</button>
         </div>
 
-        <button class="btn-my-wallet" onclick="scrollToMyCoupons()">
+        <button type="button" class="btn-my-wallet" onclick="scrollToMyCoupons()">
           <span>🎁 내 쿠폰함</span>
           <span class="vault-count-badge" id="myVaultCount">0</span>
         </button>
@@ -105,8 +105,8 @@
           <div class="chance-auth-prompt" id="chanceAuthPrompt">
             <span>👋 로그인하시면 24시간마다 3회 무료 스핀이 지급됩니다!</span>
             <div class="chance-auth-btns">
-              <button type="button" class="btn-prompt-login" onclick="openLoginModal()">로그인</button>
-              <button type="button" class="btn-prompt-register" onclick="openRegisterModal()">3초 회원가입</button>
+              <button type="button" id="btnPromptLogin" class="btn-prompt-login" onclick="openLoginModal()">로그인</button>
+              <button type="button" id="btnPromptRegister" class="btn-prompt-register" onclick="openRegisterModal()">3초 회원가입</button>
             </div>
           </div>
         </div>
@@ -390,7 +390,7 @@
             <span class="auth-icon">🔐</span>
             <h3>쿠폰모아 로그인</h3>
           </div>
-          <button class="modal-close-icon" onclick="closeLoginModal()">✕</button>
+          <button type="button" id="btnCloseLoginModal" class="modal-close-icon" onclick="closeLoginModal()">✕</button>
         </div>
         <div class="auth-modal-body">
           <p class="auth-desc">로그인하시면 24시간마다 3회 스핀 및 획득한 모든 쿠폰이 안전하게 저장됩니다.</p>
@@ -402,10 +402,10 @@
             <label>비밀번호</label>
             <input type="password" id="loginPassword" placeholder="비밀번호 입력" autocomplete="current-password" />
           </div>
-          <button class="btn-primary-auth" onclick="submitLogin()">로그인하기</button>
+          <button type="button" id="btnSubmitLogin" class="btn-primary-auth" onclick="submitLogin()">로그인하기</button>
           <div class="auth-switch-row">
             <span>아직 회원이 아니신가요?</span>
-            <button class="btn-link-switch" onclick="switchToRegister()">신규 회원가입</button>
+            <button type="button" id="btnSwitchToReg" class="btn-link-switch" onclick="switchToRegister()">신규 회원가입</button>
           </div>
         </div>
       </div>
@@ -423,7 +423,7 @@
             <span class="auth-icon">📝</span>
             <h3>신규 회원가입</h3>
           </div>
-          <button class="modal-close-icon" onclick="closeRegisterModal()">✕</button>
+          <button type="button" id="btnCloseRegisterModal" class="modal-close-icon" onclick="closeRegisterModal()">✕</button>
         </div>
         <div class="auth-modal-body">
           <p class="auth-desc">3초 만에 간편 가입하고 24시간마다 3개의 무료 쿠폰 스핀 혜택을 받아보세요!</p>
@@ -439,10 +439,10 @@
             <label>비밀번호 (4자 이상)</label>
             <input type="password" id="regPassword" placeholder="비밀번호 입력" autocomplete="new-password" />
           </div>
-          <button class="btn-primary-auth" onclick="submitRegister()">회원가입 완료</button>
+          <button type="button" id="btnSubmitRegister" class="btn-primary-auth" onclick="submitRegister()">회원가입 완료</button>
           <div class="auth-switch-row">
             <span>이미 계정이 있으신가요?</span>
-            <button class="btn-link-switch" onclick="switchToLogin()">로그인하기</button>
+            <button type="button" id="btnSwitchToLog" class="btn-link-switch" onclick="switchToLogin()">로그인하기</button>
           </div>
         </div>
       </div>
