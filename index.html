@@ -4,14 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>쿠폰모아 | 대한민국 1등 무료 쿠폰 럭키드로우</title>
-  <meta name="description" content="매일 쏟아지는 무료 쿠폰 럭키드로우! 스타벅스, GS25, CU, 배달의민족 최신 쿠폰을 100% 무료로 뽑아보세요." />
+  <meta name="description" content="매일 쏟아지는 무료 쿠폰 럭키드로우! 스타벅스, GS25, 신세계상품권, 배달의민족 최신 쿠폰을 100% 무료로 뽑아보세요." />
   
-  <!-- Open Graph -->
-  <meta property="og:title" content="쿠폰모아 - 오늘의 럭키 쿠폰 뽑기!" />
-  <meta property="og:description" content="스타벅스, GS25, 배달의민족 쿠폰을 돌림판으로 뽑아보세요!" />
-  <meta property="og:type" content="website" />
-  
-  <link rel="stylesheet" href="style.css?v=3.2.0" />
+  <link rel="stylesheet" href="style.css?v=4.0.0" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -38,14 +33,17 @@
       </a>
       <nav class="nav">
         <a href="#spinner-section" class="nav-item active">🎡 럭키 스핀</a>
-        <a href="#coupon-section" class="nav-item">📋 전체 쿠폰</a>
-        <a href="#review-section" class="nav-item">💬 당첨 후기</a>
+        <a href="#my-coupons-section" class="nav-item">🎁 내 보관함 (<span id="navVaultCount">0</span>)</a>
+        <a href="#lineup-section" class="nav-item">💎 쿠폰 라인업</a>
       </nav>
       <div class="header-right">
+        <button class="btn-my-wallet" onclick="scrollToMyCoupons()">
+          <span>🎁 내 쿠폰함</span>
+          <span class="vault-count-badge" id="myVaultCount">0</span>
+        </button>
         <button class="btn-share-header" onclick="shareWebsite()">
           <span>🔗 공유</span>
         </button>
-        <button class="btn-suggest" onclick="openAddModal()">+ 쿠폰 제보</button>
       </div>
     </div>
   </header>
@@ -56,22 +54,22 @@
       
       <div class="hero-text-col">
         <div class="event-badge">
-          <span>⚡ 오늘만 진행되는 특별 이벤트</span>
+          <span>⚡ 2026 초특급 럭키 룰렛 이벤트</span>
         </div>
         <h1 class="hero-title">
-          오늘의 행운 쿠폰<br />
+          행운의 기프티콘<br />
           <span class="text-gradient">룰렛 돌리고 받자!</span> 🎁
         </h1>
         <p class="hero-desc">
-          GS25, 스타벅스, 배달의민족, CU 등 인기 브랜드 혜택을<br />
-          지금 바로 100% 무료로 뽑아가세요!
+          신세계 5만원권, BHC 뿌링클, 스타벅스, 배달의민족 등<br />
+          지금 바로 룰렛을 돌려 100% 무료로 획득하세요!
         </p>
 
         <!-- 뽑기 기회 & 스탯 바 -->
         <div class="chance-status-card">
           <div class="chance-row">
             <div class="chance-info">
-              <span class="chance-label">오늘 남은 무료 뽑기</span>
+              <span class="chance-label">오늘 남은 뽑기 기회</span>
               <span class="chance-value"><strong id="remainingSpins">3</strong>회</span>
             </div>
             <div class="chance-progress-wrap">
@@ -79,16 +77,17 @@
             </div>
           </div>
           <div class="chance-sub">
-            <span>✨ 매일 자정 00:00 기회 자동 충전</span>
-            <button class="btn-text-action" onclick="resetSpinsFree()">충전하기</button>
+            <span>✨ 기회 소진 시 보너스 무료 충전 가능!</span>
+            <button class="btn-text-action" onclick="resetSpinsFree()">기회 충전하기</button>
           </div>
         </div>
 
         <div class="quick-tags">
-          <span class="q-tag">🔥 스타벅스 1천원</span>
-          <span class="q-tag">🍔 배민 3천원</span>
-          <span class="q-tag">☕ 메가커피 무료</span>
-          <span class="q-tag">🍿 CGV 팝콘</span>
+          <span class="q-tag">💳 신세계 5만원권</span>
+          <span class="q-tag">🍗 BHC 뿌링클세트</span>
+          <span class="q-tag">☕ 스타벅스 디저트</span>
+          <span class="q-tag">🍔 맥도날드 빅맥</span>
+          <span class="q-tag">😢 꽝 (다음 기회에)</span>
         </div>
       </div>
 
@@ -96,9 +95,7 @@
       <div class="spinner-display-col">
         <div class="wheel-stage-card">
           
-          <!-- 화려한 라이트 데코 프레임 -->
-          <div class="wheel-outer-ring">
-            
+          <div class="wheel-outer-ring" id="wheelOuterRing">
             <!-- 포인터 핀 -->
             <div class="wheel-pointer-pin" id="wheelPointerPin">
               <div class="pin-triangle"></div>
@@ -111,17 +108,15 @@
 
             <!-- 중앙 스핀 버튼 -->
             <button class="wheel-center-btn" id="wheelCenterBtn" onclick="triggerSpin()">
-              <span class="btn-spin-label">START</span>
+              <span class="btn-spin-label">SPIN</span>
               <span class="btn-spin-sub">돌리기</span>
             </button>
           </div>
 
-          <!-- 스피너 하단 팁 -->
           <div class="wheel-hint">
-            <span>💡 중앙의 <strong>START</strong> 버튼을 누르면 추첨이 시작됩니다!</span>
+            <span>💡 <strong>SPIN 버튼</strong> 또는 <strong>룰렛 판</strong>을 터치하면 바로 돌아갑니다!</span>
           </div>
 
-          <!-- 음향 토글 버튼 -->
           <div class="sound-control-wrap">
             <button class="btn-sound-toggle" id="btnSoundToggle" onclick="toggleSound()">
               <span id="soundIcon">🔊</span> 효과음 켜짐
@@ -133,49 +128,48 @@
     </div>
   </section>
 
-  <!-- 검색 및 카테고리 필터 섹션 -->
-  <section class="filter-section" id="coupon-section">
+  <!-- ================================================================= -->
+  <!-- 🎁 내가 뽑은 쿠폰 보관함 (로컬 저장소 전용 - 뽑은 것만 표시!) -->
+  <!-- ================================================================= -->
+  <section class="my-coupons-section" id="my-coupons-section">
     <div class="container">
       
+      <div class="vault-section-header">
+        <div>
+          <div class="section-tag-pill">LOCAL WALLET</div>
+          <h2 class="section-heading">🎁 내가 획득한 쿠폰 보관함</h2>
+          <p class="section-sub">내가 직접 돌려서 당첨된 쿠폰만 바코드와 함께 이곳에 영구 저장됩니다.</p>
+        </div>
+        <div class="vault-actions-right">
+          <span class="vault-total-label">보유 쿠폰: <strong id="vaultCountHeader">0</strong>개</span>
+          <button class="btn-clear-wallet" onclick="clearAllVaultCoupons()">보관함 비우기</button>
+        </div>
+      </div>
+
+      <!-- 내가 뽑은 쿠폰 그리드 -->
+      <div class="my-coupons-grid" id="myCouponsGrid">
+        <!-- JS로 동적 생성: 아직 안 뽑았으면 빈 상태 UI -->
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <!-- 💎 럭키드로우 당첨 라인업 (전체 혜택 안내) -->
+  <!-- ================================================================= -->
+  <section class="lineup-section" id="lineup-section">
+    <div class="container">
       <div class="section-title-wrap">
         <div>
-          <h2 class="section-heading">🔥 실시간 인기 쿠폰함</h2>
-          <p class="section-sub">모든 쿠폰은 발급 즉시 해당 공식 앱에서 사용하실 수 있습니다.</p>
-        </div>
-        
-        <!-- 실시간 검색창 -->
-        <div class="search-box">
-          <span class="search-icon">🔍</span>
-          <input type="text" id="couponSearchInput" placeholder="브랜드, 할인명 검색 (예: 스타벅스)" oninput="handleSearch(this.value)" />
-          <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()" style="display:none;">✕</button>
+          <div class="section-tag-pill gold">JACKPOT LINEUP</div>
+          <h2 class="section-heading">💎 이번 주 럭키드로우 라인업</h2>
+          <p class="section-sub">룰렛을 돌리면 아래의 초특급 혜택 중 하나가 100% 랜덤 바코드와 함께 발급됩니다.</p>
         </div>
       </div>
 
-      <!-- 카테고리 탭 -->
-      <div class="category-tabs" id="categoryTabs">
-        <button class="cat-tab active" data-category="all">전체보기 <span class="tab-count" id="countAll">8</span></button>
-        <button class="cat-tab" data-category="편의점">🏪 편의점 <span class="tab-count" id="countConvenience">2</span></button>
-        <button class="cat-tab" data-category="카페">☕ 카페·디저트 <span class="tab-count" id="countCafe">2</span></button>
-        <button class="cat-tab" data-category="배달">🛵 배달·맛집 <span class="tab-count" id="countDelivery">2</span></button>
-        <button class="cat-tab" data-category="뷰티">💄 뷰티·쇼핑 <span class="tab-count" id="countBeauty">1</span></button>
-        <button class="cat-tab" data-category="문화">🎬 영화·문화 <span class="tab-count" id="countCulture">1</span></button>
-      </div>
-
-      <!-- 정렬 옵션 -->
-      <div class="filter-info-bar">
-        <span class="filter-result-text">총 <strong id="filterResultCount">8</strong>개의 혜택 쿠폰</span>
-        <div class="sort-buttons">
-          <button class="sort-btn active" onclick="setSortMode('popular')">인기순</button>
-          <button class="sort-btn" onclick="setSortMode('expiry')">마감임박순</button>
-          <button class="sort-btn" onclick="setSortMode('discount')">할인율순</button>
-        </div>
-      </div>
-
-      <!-- 쿠폰 카드 그리드 -->
-      <div class="coupon-cards-grid" id="couponCardsGrid">
+      <div class="lineup-grid" id="lineupGrid">
         <!-- JS로 동적 생성 -->
       </div>
-
     </div>
   </section>
 
@@ -184,8 +178,8 @@
     <div class="container">
       <div class="review-header">
         <span class="review-badge">REAL REVIEWS</span>
-        <h2 class="section-heading text-white">실시간 당첨자 생생 리뷰 ⭐️</h2>
-        <p class="section-sub text-white-muted">방금 당첨된 사용자분들이 직접 남겨주신 실시간 리뷰입니다.</p>
+        <h2 class="section-heading text-white">실시간 당첨자 생생 후기 ⭐️</h2>
+        <p class="section-sub text-white-muted">실제 당첨된 이용자분들의 실시간 리뷰입니다.</p>
       </div>
 
       <div class="review-grid">
@@ -200,8 +194,8 @@
             </div>
             <span class="review-stars">★★★★★</span>
           </div>
-          <p class="review-body">"진짜 스타벅스 1000원 할인 쿠폰 나옴 ㅋㅋㅋ 출근길에 사이렌오더로 바로 썼어요! 대박!"</p>
-          <div class="review-coupon-tag">☕ 스타벅스 아이스 아메리카노 1,000원 할인</div>
+          <p class="review-body">"와 신세계 5만원권 진짜 뜸 ㄷㄷ 캡처해서 보관함에 고이 모셔뒀어요 ㅋㅋㅋ 최고입니다!"</p>
+          <div class="review-coupon-tag">💳 신세계백화점 상품권 50,000원권</div>
         </div>
 
         <div class="review-card">
@@ -210,13 +204,13 @@
               <span class="review-avatar">👨‍💻</span>
               <div>
                 <span class="review-name">박준* (경기 수원)</span>
-                <span class="review-date">5분 전 당첨</span>
+                <span class="review-date">3분 전 당첨</span>
               </div>
             </div>
             <span class="review-stars">★★★★★</span>
           </div>
-          <p class="review-body">"배민 3000원 할인쿠폰 개이득입니다. 점심 시켜먹을 때 코드 입력하니까 즉시 깎이네요."</p>
-          <div class="review-coupon-tag">🛵 배달의민족 첫 주문 3,000원 즉시 할인</div>
+          <p class="review-body">"BHC 뿌링클 치킨 세트 당첨 실화냐 ㅋㅋㅋ 오늘 저녁은 치킨이다 친구들한테 단톡방에 링크 다 뿌림"</p>
+          <div class="review-coupon-tag">🍗 BHC 뿌링클 + 콜라 1.25L 세트</div>
         </div>
 
         <div class="review-card">
@@ -225,13 +219,13 @@
               <span class="review-avatar">🧑‍🎓</span>
               <div>
                 <span class="review-name">김민* (인천 부평)</span>
-                <span class="review-date">12분 전 당첨</span>
+                <span class="review-date">9분 전 당첨</span>
               </div>
             </div>
             <span class="review-stars">★★★★★</span>
           </div>
-          <p class="review-body">"GS25 편의점에서 삼각김밥 사먹으면서 500원 할인 바코드 찍음 ㅋㅋ 친구들한테 단톡방에 링크 다 뿌림"</p>
-          <div class="review-coupon-tag">🏪 GS25 25주년 기념 500원 할인</div>
+          <p class="review-body">"바코드 번호까지 진짜처럼 랜덤으로 찍혀서 나옴 ㅋㅋㅋ 카톡 선물하기 받은 줄 알고 심쿵했네요"</p>
+          <div class="review-coupon-tag">☕ 스타벅스 달콤한 디저트 세트</div>
         </div>
       </div>
     </div>
@@ -247,7 +241,7 @@
           </div>
           <p class="footer-text">
             대한민국 1등 무료 쿠폰 럭키드로우 플랫폼<br />
-            온라인 및 모바일 공개 쿠폰 정보를 실시간으로 큐레이션합니다.
+            당첨된 모든 쿠폰은 고객님의 기기(로컬스토리지)에 안전하게 암호화 보관됩니다.
           </p>
         </div>
         <div class="footer-meta-col">
@@ -256,15 +250,14 @@
             <span class="meta-value">http://www.쿠폰.온라인.한국</span>
           </div>
           <div class="footer-meta-item">
-            <span class="meta-label">보안 시스템</span>
-            <span class="meta-value">24시간 DDoS 방어 &amp; SSL 보안 가동 중</span>
+            <span class="meta-label">호스팅 엔진</span>
+            <span class="meta-value">Railway Global Cloud 24시간 가동 중</span>
           </div>
         </div>
       </div>
       <div class="footer-bottom-row">
         <p class="disclaimer-text">
-          ※ 본 서비스에서 제공하는 쿠폰 정보는 각 제휴처 및 브랜드에서 공개적으로 발행한 프로모션 혜택을 기반으로 합니다.
-          본 사이트는 별도의 회원가입 없이 누구나 무료로 이용 가능하며, 어떠한 개인정보도 무단 수집하지 않습니다.
+          ※ 본 서비스에서 제공하는 쿠폰 정보는 이벤트성 랜덤 시뮬레이션 및 공개 프로모션을 기반으로 합니다.
         </p>
         <p class="copyright-text">© 2026 COUPONMOA Inc. All rights reserved.</p>
       </div>
@@ -272,68 +265,83 @@
   </footer>
 
   <!-- ================================================================= -->
-  <!-- 🏆 당첨 결과 모바일 기프티콘 모달 (진짜 쿠폰 형태의 바코드 화면) -->
+  <!-- 🏆 당첨 결과 모달 (절대 클릭 씹힘 없는 최상단 레이어) -->
   <!-- ================================================================= -->
-  <div class="modal-backdrop" id="winModal" onclick="handleModalBackdropClick(event, 'winModal')">
+  <div class="modal-backdrop" id="winModal">
     <div class="gifticon-modal-dialog">
       <div class="gifticon-ticket">
         
-        <!-- 상단 축하 배너 -->
-        <div class="ticket-header">
-          <div class="congrats-title">🎉 축하합니다! 당첨되었습니다</div>
-          <button class="ticket-close-btn" onclick="closeWinModal()">✕</button>
+        <!-- 상단 축하 헤더 -->
+        <div class="ticket-header" id="winModalHeader">
+          <div class="congrats-title" id="winModalCongratsTitle">🎉 축하합니다! 당첨되었습니다</div>
+          <button type="button" class="ticket-close-btn" id="btnWinClose" onclick="closeWinModal()">✕</button>
         </div>
 
         <!-- 모바일 교환권 본체 -->
-        <div class="ticket-card">
+        <div class="ticket-card" id="winTicketCard">
           <div class="ticket-brand-header">
             <div class="ticket-brand-logo" id="winModalLogo">☕</div>
             <div class="ticket-brand-info">
               <span class="ticket-provider-name" id="winModalProvider">스타벅스</span>
-              <span class="ticket-badge-pill">모바일 교환권</span>
+              <span class="ticket-badge-pill" id="winModalTypeBadge">모바일 교환권</span>
             </div>
           </div>
 
           <div class="ticket-title-block">
-            <h3 class="ticket-coupon-name" id="winModalName">아이스 아메리카노 1,000원 할인</h3>
-            <div class="ticket-discount-amount" id="winModalDiscount">1,000원 할인</div>
+            <h3 class="ticket-coupon-name" id="winModalName">스타벅스 달콤한 디저트 세트</h3>
+            <div class="ticket-discount-amount" id="winModalDiscount">무료 교환권</div>
           </div>
 
           <!-- 바코드 캔버스 그래픽 -->
-          <div class="ticket-barcode-section">
+          <div class="ticket-barcode-section" id="winBarcodeSection">
             <canvas id="barcodeCanvas" width="280" height="70"></canvas>
             <div class="barcode-number" id="winModalCode">8809 3821 9920 1482</div>
-            <button class="btn-copy-code" onclick="copyWinCouponCode()">
-              <span id="copyBtnIcon">📋</span> 번호 복사하기
+            <button type="button" class="btn-copy-code" id="btnCopyBarcode" onclick="copyWinCouponCode()">
+              <span>📋</span> 바코드 번호 복사
             </button>
           </div>
 
           <!-- 상세 조건 안내 -->
           <div class="ticket-condition-list">
             <div class="ticket-cond-row">
+              <span class="cond-label">보관 상태</span>
+              <span class="cond-value text-green">💾 내 쿠폰함 자동 보관 완료!</span>
+            </div>
+            <div class="ticket-cond-row">
               <span class="cond-label">사용 조건</span>
-              <span class="cond-value" id="winModalCondition">아이스 음료 구매 시</span>
+              <span class="cond-value" id="winModalCondition">전국 매장 사용 가능</span>
             </div>
             <div class="ticket-cond-row">
               <span class="cond-label">유효 기간</span>
-              <span class="cond-value text-red" id="winModalExpiry">2026.10.15까지 (D-37)</span>
+              <span class="cond-value text-red" id="winModalExpiry">2026.12.31까지 (사용가능)</span>
             </div>
             <div class="ticket-cond-row">
               <span class="cond-label">사용 방법</span>
-              <span class="cond-value" id="winModalSource">스타벅스 공식 앱 결제 시 적용</span>
+              <span class="cond-value" id="winModalSource">매장 카운터/키오스크 바코드 스캔</span>
             </div>
+          </div>
+
+          <!-- 사용 완료 도장 영역 -->
+          <div class="stamp-container" id="winModalStamp" style="display:none;">
+            <div class="used-stamp-mark">사용 완료</div>
+            <div class="used-stamp-date" id="winModalStampDate">2026.09.08 결제완료</div>
           </div>
         </div>
 
-        <!-- 모달 하단 버튼 액션 -->
+        <!-- 모달 하단 버튼 액션 (확실한 터치/클릭) -->
         <div class="ticket-actions">
-          <button class="btn-ticket-download" onclick="downloadCouponImage()">
-            💾 쿠폰 이미지로 저장
-          </button>
-          <button class="btn-ticket-share" onclick="shareWinningResult()">
+          <div class="ticket-btn-row" id="winActionRow1">
+            <button type="button" class="btn-ticket-download" id="btnDownloadImg" onclick="downloadCouponImage()">
+              💾 이미지 저장
+            </button>
+            <button type="button" class="btn-ticket-use" id="btnMarkUsed" onclick="toggleMarkUsed()">
+              ✅ 매장 사용 처리
+            </button>
+          </div>
+          <button type="button" class="btn-ticket-share" id="btnShareWin" onclick="shareWinningResult()">
             🎁 친구에게 당첨 자랑하기
           </button>
-          <button class="btn-ticket-again" onclick="closeWinModalAndSpin()">
+          <button type="button" class="btn-ticket-again" id="btnSpinAgain" onclick="closeWinModalAndSpin()">
             🔄 한 번 더 돌리기
           </button>
         </div>
@@ -342,90 +350,10 @@
     </div>
   </div>
 
-  <!-- 쿠폰 상세 정보 모달 -->
-  <div class="modal-backdrop" id="detailModal" onclick="handleModalBackdropClick(event, 'detailModal')">
-    <div class="gifticon-modal-dialog">
-      <div class="gifticon-ticket">
-        <div class="ticket-header">
-          <div class="congrats-title">🏷️ 쿠폰 상세 안내</div>
-          <button class="ticket-close-btn" onclick="closeDetailModal()">✕</button>
-        </div>
-        <div class="ticket-card" id="detailModalCard">
-          <!-- JS로 내용 렌더링 -->
-        </div>
-        <div class="ticket-actions">
-          <button class="btn-ticket-download" onclick="copyDetailCode()">
-            📋 쿠폰 코드 복사하기
-          </button>
-          <button class="btn-ticket-again" onclick="closeDetailModal()">
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 쿠폰 제보 모달 -->
-  <div class="modal-backdrop" id="addModal" onclick="handleModalBackdropClick(event, 'addModal')">
-    <div class="simple-modal-dialog">
-      <div class="simple-modal-header">
-        <h3>📝 새로운 쿠폰 정보 제보</h3>
-        <button class="modal-close-icon" onclick="closeAddModal()">✕</button>
-      </div>
-      <div class="simple-modal-body">
-        <div class="guide-alert">
-          💡 공개된 할인 이벤트나 쿠폰 코드를 알려주시면 검토 후 모든 사용자에게 공개됩니다.
-        </div>
-        <form id="suggestForm" onsubmit="handleSuggestSubmit(event)">
-          <div class="form-row-2">
-            <div class="form-field">
-              <label>제공 브랜드 *</label>
-              <input type="text" id="sugProvider" placeholder="예: 배달의민족" required />
-            </div>
-            <div class="form-field">
-              <label>카테고리 *</label>
-              <select id="sugCategory" required>
-                <option value="편의점">🏪 편의점</option>
-                <option value="카페">☕ 카페·디저트</option>
-                <option value="배달" selected>🛵 배달·맛집</option>
-                <option value="뷰티">💄 뷰티·쇼핑</option>
-                <option value="문화">🎬 영화·문화</option>
-                <option value="기타">🎁 기타</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-field">
-            <label>쿠폰 이름 *</label>
-            <input type="text" id="sugName" placeholder="예: 주말 전메뉴 2,000원 할인" required />
-          </div>
-          <div class="form-row-2">
-            <div class="form-field">
-              <label>할인 혜택 *</label>
-              <input type="text" id="sugDiscount" placeholder="예: 2,000원 즉시할인" required />
-            </div>
-            <div class="form-field">
-              <label>유효기간 *</label>
-              <input type="date" id="sugExpiry" required />
-            </div>
-          </div>
-          <div class="form-field">
-            <label>사용 조건</label>
-            <input type="text" id="sugCondition" placeholder="예: 15,000원 이상 주문 시" />
-          </div>
-          <div class="form-field">
-            <label>쿠폰 코드 (있을 경우)</label>
-            <input type="text" id="sugCode" placeholder="예: WEEKEND2000" />
-          </div>
-          <button type="submit" class="btn-submit-form">제보 신청하기</button>
-        </form>
-      </div>
-    </div>
-  </div>
-
   <!-- 토스트 메시지 -->
   <div class="toast-popup" id="toastPopup"></div>
 
-  <!-- JS 로드 (버전 파라미터로 캐시 무효화) -->
-  <script src="script.js?v=3.2.0"></script>
+  <!-- JS 로드 -->
+  <script src="script.js?v=4.0.0"></script>
 </body>
 </html>
