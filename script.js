@@ -213,15 +213,19 @@ const WHEEL_PALETTE = [
 let isSpinning = false;
 let currentWheelRotation = 0;
 let remainingSpins = 3;
+let isUnlimited = false;
+let cooldownSeconds = 0;
+let nextResetTime = null;
+let cooldownTimerInterval = null;
 let soundEnabled = true;
 let currentWinningCoupon = null;
 let mySavedCoupons = [];
+let currentUser = null; // { id, username, name, role, ... }
 
 // ── 3. 초기화 (DOM Loaded) ──
 document.addEventListener('DOMContentLoaded', () => {
   initLiveTicker();
-  loadMyVaultCoupons();
-  initRemainingSpins();
+  initUserSession(); // 사용자 로그인 세션 확인 및 복구
   renderCouponWheel();
   renderLineupTeaser();
   bindAllClickEvents();
@@ -328,33 +332,180 @@ function initLiveTicker() {
   setInterval(updateTicker, 3200);
 }
 
-// ── 6. 남은 기회 로컬 관리 ──
-function initRemainingSpins() {
-  const saved = localStorage.getItem('coupon_spins_left_v4');
-  if (saved !== null) {
-    remainingSpins = parseInt(saved, 10);
-    if (isNaN(remainingSpins)) remainingSpins = 3;
+// ── 6. 사용자 인증 & 24시간 3회 스핀 관리 ──
+function initUserSession() {
+  const savedUser = localStorage.getItem('coupon_user_session_v5');
+  if (savedUser) {
+    try {
+      currentUser = JSON.parse(savedUser);
+      applyUserUI(currentUser);
+      syncSpinStatusFromServer();
+      loadUserCoupons();
+    } catch (e) {
+      currentUser = null;
+      applyGuestUI();
+    }
   } else {
-    remainingSpins = 3;
+    currentUser = null;
+    applyGuestUI();
   }
+}
+
+function applyUserUI(user) {
+  const guestGroup = document.getElementById('guestActionGroup');
+  const userGroup = document.getElementById('userActionGroup');
+  const userNameText = document.getElementById('userNameText');
+  const userRoleTag = document.getElementById('userRoleTag');
+  const btnAdmin = document.getElementById('btnAdminPanel');
+  const adminBadge = document.getElementById('adminUnlimitedBadge');
+
+  if (guestGroup) guestGroup.style.display = 'none';
+  if (userGroup) userGroup.style.display = 'flex';
+  if (userNameText) userNameText.textContent = user.name || user.username;
+
+  // 관리자 여부 확인
+  const isAdmin = user.role === 'admin' || user.username === 'taeiyoon';
+  if (userRoleTag) {
+    userRoleTag.textContent = isAdmin ? '👑 관리자' : '회원';
+    userRoleTag.className = 'user-role-tag' + (isAdmin ? ' admin' : '');
+  }
+
+  // 관리자 전용 버튼: 일반 회원에게는 절대 보이지 않음!
+  if (btnAdmin) {
+    btnAdmin.style.display = isAdmin ? 'inline-block' : 'none';
+  }
+  if (adminBadge) {
+    adminBadge.style.display = isAdmin ? 'inline-block' : 'none';
+  }
+
+  if (isAdmin) {
+    isUnlimited = true;
+    remainingSpins = 999999;
+  }
+
   updateSpinsDisplay();
+}
+
+function applyGuestUI() {
+  const guestGroup = document.getElementById('guestActionGroup');
+  const userGroup = document.getElementById('userActionGroup');
+  const btnAdmin = document.getElementById('btnAdminPanel');
+  const adminBadge = document.getElementById('adminUnlimitedBadge');
+
+  if (guestGroup) guestGroup.style.display = 'flex';
+  if (userGroup) userGroup.style.display = 'none';
+  if (btnAdmin) btnAdmin.style.display = 'none';
+  if (adminBadge) adminBadge.style.display = 'none';
+
+  isUnlimited = false;
+  remainingSpins = 0;
+  mySavedCoupons = [];
+  updateVaultBadges();
+  renderMyVaultGrid();
+  updateSpinsDisplay();
+}
+
+// 서버와 24시간 스핀 상태 동기화
+async function syncSpinStatusFromServer() {
+  if (!currentUser) return;
+  try {
+    const res = await fetch(`/api/spin/status?username=${encodeURIComponent(currentUser.username)}`);
+    const data = await res.json();
+    if (data.success) {
+      isUnlimited = data.isUnlimited;
+      remainingSpins = data.remainingSpins;
+      cooldownSeconds = data.cooldownSeconds || 0;
+      nextResetTime = data.nextResetTime;
+      updateSpinsDisplay();
+      startCooldownCountdown();
+    }
+  } catch (e) {
+    console.error('스핀 동기화 오류:', e);
+  }
+}
+
+// 24시간 쿨타임 실시간 타이머
+function startCooldownCountdown() {
+  if (cooldownTimerInterval) clearInterval(cooldownTimerInterval);
+
+  function tick() {
+    const timerEl = document.getElementById('cooldownTimerText');
+    const noticeEl = document.getElementById('chanceNoticeText');
+    if (!timerEl) return;
+
+    if (isUnlimited) {
+      timerEl.textContent = '무제한 혜택 적용 중';
+      return;
+    }
+
+    if (!currentUser) {
+      timerEl.textContent = '로그인 필요';
+      return;
+    }
+
+    if (remainingSpins > 0) {
+      if (nextResetTime) {
+        const diffSec = Math.max(0, Math.floor((nextResetTime - Date.now()) / 1000));
+        timerEl.textContent = `${formatDuration(diffSec)} 후 3회 리셋`;
+      } else {
+        timerEl.textContent = '지금 뽑기 가능 (3회)';
+      }
+      return;
+    }
+
+    if (nextResetTime) {
+      const diffSec = Math.max(0, Math.floor((nextResetTime - Date.now()) / 1000));
+      if (diffSec <= 0) {
+        timerEl.textContent = '충전 완료! 새로고침';
+        syncSpinStatusFromServer();
+      } else {
+        timerEl.textContent = `${formatDuration(diffSec)} 후 충전`;
+      }
+    } else {
+      timerEl.textContent = '충전 대기 중';
+    }
+  }
+
+  tick();
+  cooldownTimerInterval = setInterval(tick, 1000);
+}
+
+function formatDuration(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return `${h.toString().padStart(2, '0')}시간 ${m.toString().padStart(2, '0')}분 ${s.toString().padStart(2, '0')}초`;
 }
 
 function updateSpinsDisplay() {
   const spinsEl = document.getElementById('remainingSpins');
   const barEl = document.getElementById('chanceProgressBar');
-  if (spinsEl) spinsEl.textContent = Math.max(0, remainingSpins);
+  const unitEl = document.getElementById('spinUnitText');
+  const labelEl = document.getElementById('chanceLabelText');
+
+  if (isUnlimited) {
+    if (spinsEl) spinsEl.textContent = '∞';
+    if (unitEl) unitEl.textContent = ' (무제한)';
+    if (barEl) barEl.style.width = '100%';
+    if (labelEl) labelEl.textContent = '👑 관리자 권한 (스핀 무제한)';
+    return;
+  }
+
+  if (unitEl) unitEl.textContent = '회';
+  if (labelEl) labelEl.textContent = '남은 뽑기 기회 (24시간마다 3회 지급)';
+
+  if (!currentUser) {
+    if (spinsEl) spinsEl.textContent = '0';
+    if (barEl) barEl.style.width = '0%';
+    return;
+  }
+
+  const currentCount = Math.max(0, remainingSpins);
+  if (spinsEl) spinsEl.textContent = currentCount;
   if (barEl) {
-    const pct = Math.min(100, Math.max(10, (remainingSpins / 3) * 100));
+    const pct = Math.min(100, Math.max(0, (currentCount / 3) * 100));
     barEl.style.width = pct + '%';
   }
-  localStorage.setItem('coupon_spins_left_v4', remainingSpins);
-}
-
-function resetSpinsFree() {
-  remainingSpins = 3;
-  updateSpinsDisplay();
-  showToast('🎟️ 뽑기 기회가 3회로 충전되었습니다!');
 }
 
 // ── 7. 룰렛 캔버스 렌더링 ──
@@ -471,18 +622,49 @@ function bindElementAction(elemId, handler) {
 }
 
 // ── 9. 스핀 회전 로직 ──
-function triggerSpin() {
+async function triggerSpin() {
   if (isSpinning) return;
-  
-  if (remainingSpins <= 0) {
-    remainingSpins = 3;
-    showToast('🎁 보너스 뽑기 기회가 3회 충전되었습니다!');
+
+  // 1) 로그인 확인 (신규 회원은 반드시 가입 후 로그인해야 함)
+  if (!currentUser) {
+    showToast('⚠️ 로그인이 필요합니다! 회원가입 또는 로그인 후 이용해주세요.');
+    openLoginModal();
+    return;
+  }
+
+  // 2) 일반 회원의 경우 잔여 기회 체크
+  if (!isUnlimited && remainingSpins <= 0) {
+    showToast('⏳ 오늘의 뽑기 기회(3회)를 모두 소진하셨습니다. 24시간 후 다시 충전됩니다!');
+    return;
+  }
+
+  // 3) 서버에 스핀 1회 차감 요청
+  try {
+    const res = await fetch('/api/spin/use', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: currentUser.username })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showToast(data.error || '스핀 기회가 부족합니다.');
+      syncSpinStatusFromServer();
+      return;
+    }
+
+    // 성공 시 잔여 횟수 갱신
+    remainingSpins = data.remainingSpins;
+    isUnlimited = data.isUnlimited;
+    nextResetTime = data.nextResetTime;
+    cooldownSeconds = data.cooldownSeconds;
+    updateSpinsDisplay();
+    startCooldownCountdown();
+  } catch (err) {
+    console.error('스핀 요청 오류:', err);
   }
   
   getAudioContext();
   isSpinning = true;
-  remainingSpins--;
-  updateSpinsDisplay();
   
   const btn = document.getElementById('wheelCenterBtn');
   if (btn) btn.disabled = true;
@@ -836,17 +1018,24 @@ function downloadCouponImage() {
   }
 }
 
-// ── 15. 로컬스토리지 보관함 기능 (자기가 뽑은 것만 관리!) ──
-function loadMyVaultCoupons() {
-  const data = localStorage.getItem('my_coupon_vault_v4');
+// ── 15. 계정별 쿠폰 보관함 기능 (로그인된 계정에 안전 저장 & 서버 동기화) ──
+function loadUserCoupons() {
+  if (!currentUser) {
+    mySavedCoupons = [];
+    updateVaultBadges();
+    renderMyVaultGrid();
+    return;
+  }
+  const key = `my_coupon_vault_${currentUser.username}`;
+  const data = localStorage.getItem(key);
   if (data) {
     try {
       mySavedCoupons = JSON.parse(data);
     } catch (e) {
-      mySavedCoupons = [];
+      mySavedCoupons = currentUser.savedCoupons || [];
     }
   } else {
-    mySavedCoupons = [];
+    mySavedCoupons = currentUser.savedCoupons || [];
   }
   updateVaultBadges();
   renderMyVaultGrid();
@@ -854,7 +1043,17 @@ function loadMyVaultCoupons() {
 
 function saveToMyVault(coupon) {
   mySavedCoupons.unshift(coupon);
-  localStorage.setItem('my_coupon_vault_v4', JSON.stringify(mySavedCoupons));
+  if (currentUser) {
+    const key = `my_coupon_vault_${currentUser.username}`;
+    localStorage.setItem(key, JSON.stringify(mySavedCoupons));
+    
+    // 서버 DB와도 비동기 동기화
+    fetch('/api/coupons/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: currentUser.username, coupon: coupon })
+    }).catch(() => {});
+  }
   updateVaultBadges();
   renderMyVaultGrid();
 }
@@ -863,7 +1062,10 @@ function updateVaultCouponState(coupon) {
   const idx = mySavedCoupons.findIndex(c => c.vaultId === coupon.vaultId);
   if (idx !== -1) {
     mySavedCoupons[idx] = coupon;
-    localStorage.setItem('my_coupon_vault_v4', JSON.stringify(mySavedCoupons));
+    if (currentUser) {
+      const key = `my_coupon_vault_${currentUser.username}`;
+      localStorage.setItem(key, JSON.stringify(mySavedCoupons));
+    }
   }
 }
 
@@ -1044,9 +1246,239 @@ function showToast(msg) {
   }, 3200);
 }
 
-// ── 18. 전역 함수 바인딩 ──
+// ── 18. 회원가입 / 로그인 / 최고관리자 모달 & API 연동 ──
+function openLoginModal() {
+  const m = document.getElementById('loginModal');
+  if (m) m.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLoginModal() {
+  const m = document.getElementById('loginModal');
+  if (m) m.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function openRegisterModal() {
+  const m = document.getElementById('registerModal');
+  if (m) m.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeRegisterModal() {
+  const m = document.getElementById('registerModal');
+  if (m) m.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function switchToRegister() {
+  closeLoginModal();
+  setTimeout(openRegisterModal, 150);
+}
+
+function switchToLogin() {
+  closeRegisterModal();
+  setTimeout(openLoginModal, 150);
+}
+
+// 로그인 제출
+async function submitLogin() {
+  const uInput = document.getElementById('loginUsername');
+  const pInput = document.getElementById('loginPassword');
+  const username = uInput ? uInput.value.trim() : '';
+  const password = pInput ? pInput.value.trim() : '';
+
+  if (!username || !password) {
+    showToast('아이디와 비밀번호를 모두 입력해주세요.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showToast(data.error || '로그인에 실패했습니다.');
+      return;
+    }
+
+    currentUser = data.user;
+    localStorage.setItem('coupon_user_session_v5', JSON.stringify(currentUser));
+    closeLoginModal();
+    applyUserUI(currentUser);
+    loadUserCoupons();
+    syncSpinStatusFromServer();
+
+    const isAdmin = currentUser.role === 'admin' || currentUser.username === 'taeiyoon';
+    if (isAdmin) {
+      showToast('👑 최고 관리자(taeiyoon)님 환영합니다! 스핀 무제한 활성화됨');
+    } else {
+      showToast(`🎉 ${currentUser.name || currentUser.username}님, 로그인되었습니다! (24시간마다 3회 스핀)`);
+    }
+  } catch (e) {
+    showToast('서버 통신 오류가 발생했습니다.');
+  }
+}
+
+// 회원가입 제출
+async function submitRegister() {
+  const uInput = document.getElementById('regUsername');
+  const nInput = document.getElementById('regName');
+  const pInput = document.getElementById('regPassword');
+  const username = uInput ? uInput.value.trim() : '';
+  const name = nInput ? nInput.value.trim() : '';
+  const password = pInput ? pInput.value.trim() : '';
+
+  if (!username || !password) {
+    showToast('아이디와 비밀번호를 모두 입력해주세요.');
+    return;
+  }
+  if (username.length < 3) {
+    showToast('아이디는 3자 이상이어야 합니다.');
+    return;
+  }
+  if (password.length < 4) {
+    showToast('비밀번호는 4자 이상이어야 합니다.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, name, password })
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showToast(data.error || '회원가입에 실패했습니다.');
+      return;
+    }
+
+    showToast('✨ 회원가입 성공! 가입하신 아이디로 로그인해주세요.');
+    closeRegisterModal();
+    setTimeout(() => {
+      const loginU = document.getElementById('loginUsername');
+      if (loginU) loginU.value = username;
+      openLoginModal();
+    }, 250);
+  } catch (e) {
+    showToast('서버 통신 오류가 발생했습니다.');
+  }
+}
+
+// 로그아웃
+function logoutUser() {
+  if (confirm('로그아웃 하시겠습니까?')) {
+    currentUser = null;
+    localStorage.removeItem('coupon_user_session_v5');
+    applyGuestUI();
+    showToast('로그아웃 되었습니다.');
+  }
+}
+
+// ── 19. 최고 관리자 전용 대시보드 함수들 (taeiyoon) ──
+function openAdminModal() {
+  if (!currentUser || (currentUser.role !== 'admin' && currentUser.username !== 'taeiyoon')) {
+    showToast('관리자 권한이 없습니다.');
+    return;
+  }
+  const m = document.getElementById('adminModal');
+  if (m) m.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  loadAdminUserList();
+}
+
+function closeAdminModal() {
+  const m = document.getElementById('adminModal');
+  if (m) m.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+async function loadAdminUserList() {
+  if (!currentUser) return;
+  const tbody = document.getElementById('adminUserTableBody');
+  const countEl = document.getElementById('adminTotalUsers');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">회원 목록 조회 중...</td></tr>';
+
+  try {
+    const res = await fetch(`/api/admin/users?admin=${encodeURIComponent(currentUser.username)}`);
+    const data = await res.json();
+
+    if (!data.success) {
+      tbody.innerHTML = `<tr><td colspan="5" style="color:red; text-align:center;">${data.error}</td></tr>`;
+      return;
+    }
+
+    if (countEl) countEl.textContent = `${data.totalUsers}명`;
+
+    if (data.users.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">등록된 회원이 없습니다.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.users.map(u => `
+      <tr>
+        <td><strong>${u.username}</strong>${u.name ? ` (${u.name})` : ''}</td>
+        <td><span class="user-role-tag ${u.role === 'admin' ? 'admin' : ''}">${u.role === 'admin' ? '👑 관리자' : '일반회원'}</span></td>
+        <td><strong style="color: ${u.role === 'admin' ? '#FF9800' : '#00B14F'}">${u.remainingSpins}</strong></td>
+        <td>${u.couponCount}개</td>
+        <td style="color:#888; font-size:0.75rem;">${u.createdAt ? u.createdAt.split('T')[0] : '-'}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:red; text-align:center;">목록 조회 오류</td></tr>';
+  }
+}
+
+// 관리자가 특정 회원에게 스핀 지급
+async function adminRechargeUserSpins() {
+  if (!currentUser) return;
+  const targetInput = document.getElementById('adminTargetUser');
+  const countSelect = document.getElementById('adminAddCount');
+  const targetUsername = targetInput ? targetInput.value.trim() : '';
+  const addSpins = countSelect ? countSelect.value : '3';
+
+  if (!targetUsername) {
+    showToast('스핀을 지급할 회원 아이디를 입력해주세요.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/admin/reset-user-spins', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        admin: currentUser.username,
+        targetUsername,
+        addSpins
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✅ ${data.message}`);
+      if (targetInput) targetInput.value = '';
+      loadAdminUserList();
+      // 만약 자기 자신 충전이면 즉시 동기화
+      if (targetUsername.toLowerCase() === currentUser.username.toLowerCase()) {
+        syncSpinStatusFromServer();
+      }
+    } else {
+      showToast(data.error || '지급 실패');
+    }
+  } catch (e) {
+    showToast('통신 오류 발생');
+  }
+}
+
+// ── 20. 전역 함수 바인딩 ──
 window.triggerSpin = triggerSpin;
-window.resetSpinsFree = resetSpinsFree;
 window.toggleSound = toggleSound;
 window.closeWinModal = closeWinModal;
 window.closeWinModalAndSpin = closeWinModalAndSpin;
@@ -1058,6 +1490,21 @@ window.copyWinCouponCode = copyWinCouponCode;
 window.clearAllVaultCoupons = clearAllVaultCoupons;
 window.scrollToMyCoupons = scrollToMyCoupons;
 window.copyDirectCode = copyDirectCode;
+
+// 인증 및 관리자 함수 전역 노출
+window.openLoginModal = openLoginModal;
+window.closeLoginModal = closeLoginModal;
+window.openRegisterModal = openRegisterModal;
+window.closeRegisterModal = closeRegisterModal;
+window.switchToRegister = switchToRegister;
+window.switchToLogin = switchToLogin;
+window.submitLogin = submitLogin;
+window.submitRegister = submitRegister;
+window.logoutUser = logoutUser;
+window.openAdminModal = openAdminModal;
+window.closeAdminModal = closeAdminModal;
+window.loadAdminUserList = loadAdminUserList;
+window.adminRechargeUserSpins = adminRechargeUserSpins;
 
 // ── 19. 방문자 통계 및 디스코드 웹훅 연동 ──
 (function trackVisitor() {
