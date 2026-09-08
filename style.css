@@ -1685,6 +1685,52 @@ input, select {
   font-weight: 800;
 }
 
+/* 룰렛 카드 내 로그인 유도 박스 */
+.chance-auth-prompt {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chance-auth-prompt span {
+  font-size: 0.8rem;
+  color: #FFD54F;
+  font-weight: 700;
+}
+
+.chance-auth-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-prompt-login {
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-prompt-register {
+  padding: 6px 14px;
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: #FFFFFF;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(255, 43, 68, 0.35);
+}
+
 /* 인증 모달 */
 .auth-modal-dialog {
   width: 100%;
