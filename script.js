@@ -611,6 +611,24 @@ function bindAllClickEvents() {
   bindElementAction('btnShareWin', () => shareWinningResult());
   bindElementAction('btnSpinAgain', () => closeWinModalAndSpin());
   bindElementAction('btnCopyBarcode', () => copyWinCouponCode());
+
+  // 로그인 / 회원가입 / 관리자 모달 버튼 안전 바인딩
+  bindElementAction('btnHeaderLogin', () => openLoginModal());
+  bindElementAction('btnHeaderRegister', () => openRegisterModal());
+  bindElementAction('btnPromptLogin', () => openLoginModal());
+  bindElementAction('btnPromptRegister', () => openRegisterModal());
+  bindElementAction('btnAdminPanel', () => openAdminModal());
+  bindElementAction('btnLogout', () => logoutUser());
+  bindElementAction('btnSubmitLogin', () => submitLogin());
+  bindElementAction('btnSubmitRegister', () => submitRegister());
+  bindElementAction('btnSwitchToReg', () => switchToRegister());
+  bindElementAction('btnSwitchToLog', () => switchToLogin());
+  bindElementAction('btnCloseLoginModal', () => closeLoginModal());
+  bindElementAction('btnCloseRegisterModal', () => closeRegisterModal());
+  bindElementAction('btnCloseAdminModal', () => closeAdminModal());
+  bindElementAction('btnAdminCloseBottom', () => closeAdminModal());
+  bindElementAction('btnAdminRecharge', () => adminRechargeUserSpins());
+  bindElementAction('btnAdminRefresh', () => loadAdminUserList());
 }
 
 function bindElementAction(elemId, handler) {
