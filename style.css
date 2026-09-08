@@ -1095,7 +1095,7 @@ input, select {
 }
 
 .modal-backdrop.active {
-  display: flex;
+  display: flex !important;
 }
 
 /* ── 10. 기프티콘 모바일 교환권 모달 (진짜 쿠폰 스타일) ── */
@@ -1517,12 +1517,44 @@ input, select {
 
 @media (max-width: 640px) {
   .header-inner {
-    padding: 0 16px;
-    height: 56px;
+    padding: 0 10px;
+    height: 54px;
+    gap: 6px;
   }
 
   .nav {
     display: none;
+  }
+
+  .logo-title {
+    font-size: 1.1rem;
+  }
+
+  .logo-tag {
+    display: none;
+  }
+
+  .header-right {
+    gap: 5px;
+  }
+
+  .btn-share-header {
+    display: none;
+  }
+
+  .btn-my-wallet {
+    padding: 5px 8px;
+    font-size: 0.74rem;
+  }
+
+  .btn-auth-login {
+    padding: 5px 8px;
+    font-size: 0.74rem;
+  }
+
+  .btn-auth-register {
+    padding: 5px 9px;
+    font-size: 0.74rem;
   }
 
   .hero-section {
@@ -1772,6 +1804,59 @@ input, select {
   color: var(--text-sub);
   margin-bottom: 20px;
   line-height: 1.5;
+}
+
+.modal-close-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #F2F4F7;
+  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.modal-close-icon:hover {
+  background: #E5E8EB;
+  color: var(--text-main);
+}
+
+.form-field {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.form-field label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-sub);
+}
+
+.form-field input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  background: #FFFFFF;
+  color: var(--text-main);
+  box-sizing: border-box;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.form-field input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255, 43, 68, 0.15);
 }
 
 .btn-primary-auth {
