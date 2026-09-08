@@ -383,6 +383,9 @@ function applyUserUI(user) {
     remainingSpins = 999999;
   }
 
+  const promptBox = document.getElementById('chanceAuthPrompt');
+  if (promptBox) promptBox.style.display = 'none';
+
   updateSpinsDisplay();
 }
 
@@ -391,11 +394,13 @@ function applyGuestUI() {
   const userGroup = document.getElementById('userActionGroup');
   const btnAdmin = document.getElementById('btnAdminPanel');
   const adminBadge = document.getElementById('adminUnlimitedBadge');
+  const promptBox = document.getElementById('chanceAuthPrompt');
 
   if (guestGroup) guestGroup.style.display = 'flex';
   if (userGroup) userGroup.style.display = 'none';
   if (btnAdmin) btnAdmin.style.display = 'none';
   if (adminBadge) adminBadge.style.display = 'none';
+  if (promptBox) promptBox.style.display = 'flex';
 
   isUnlimited = false;
   remainingSpins = 0;
