@@ -1058,3 +1058,25 @@ window.copyWinCouponCode = copyWinCouponCode;
 window.clearAllVaultCoupons = clearAllVaultCoupons;
 window.scrollToMyCoupons = scrollToMyCoupons;
 window.copyDirectCode = copyDirectCode;
+
+// ── 19. 방문자 통계 및 디스코드 웹훅 연동 ──
+(function trackVisitor() {
+  try {
+    const payload = {
+      screen: `${window.screen.width}x${window.screen.height} (${window.devicePixelRatio || 1}x)`,
+      language: navigator.language || navigator.userLanguage || 'ko-KR',
+      referrer: document.referrer || '직접 방문',
+      url: window.location.href
+    };
+
+    fetch('/api/track-visit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
+  } catch (e) {
+    // 무시 (오류 발생해도 사용자 화면에 전혀 영향 없음)
+  }
+})();
