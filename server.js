@@ -390,42 +390,21 @@ app.use((err, req, res, next) => {
 });
 
 // ════════════════════════════════════════
-//  서버 시작 (포트 80 및 포트 3000 동시 리슨)
+//  서버 시작 (Railway process.env.PORT 대응)
 // ════════════════════════════════════════
-function startServerOnPort(port, isPrimary = true) {
-  const s = http.createServer(app);
-  s.keepAliveTimeout = 65000;
-  s.headersTimeout = 66000;
-  s.maxConnections = 500;
+const TARGET_PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  s.listen(port, HOST, () => {
-    logger.info(`🚀 [PORT ${port}] 서버 시작! http://${HOST}:${port}`);
-    if (isPrimary) {
-      logger.info(`🌐 연결 도메인: http://www.쿠폰.온라인.한국 (포트 80 기본)`);
-      logger.info(`🛡️  DDoS 방지 및 보안 헤더 활성화 완료`);
-    }
-  });
+const server = app.listen(TARGET_PORT, '0.0.0.0', () => {
+  logger.info(`🚀 [PORT ${TARGET_PORT}] 서버 가동 완료!`);
+  logger.info(`🌐 배포 URL 정상 연결 준비 완료`);
+});
 
-  s.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      logger.warn(`⚠️  [PORT ${port}] 이미 다른 프로그램이 사용 중입니다.`);
-    } else {
-      logger.error(`❌ [PORT ${port}] 바인딩 실패: ${err.message}`);
-    }
-  });
-
-  return s;
-}
-
-// 주 포트 80 (도메인 기본 포트) & 보조 포트 3000 (로컬 백업 포트)
-const server80 = startServerOnPort(80, true);
-const server3000 = startServerOnPort(3000, false);
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
 
 process.on('SIGTERM', () => {
   logger.info('SIGTERM 수신 - 서버 종료 중...');
-  server80.close();
-  server3000.close();
-  process.exit(0);
+  server.close(() => process.exit(0));
 });
 
 process.on('uncaughtException', (err) => {
