@@ -398,16 +398,164 @@ app.post('/api/track-visit', (req, res) => {
 // ════════════════════════════════════════
 const USERS_FILE = path.join(__dirname, 'users.json');
 
+const DEFAULT_INITIAL_USERS = [
+  {
+    id: 'admin-taeiyoon',
+    username: 'taeiyoon',
+    password: 'a3253511!',
+    name: '최고 관리자',
+    role: 'admin',
+    createdAt: '2026-09-01T09:00:00.000Z',
+    remainingSpins: 999999,
+    lastResetAt: Date.now(),
+    savedCoupons: []
+  },
+  {
+    id: 'user-001',
+    username: 'minji_lee',
+    password: 'user1234!',
+    name: '이민지',
+    role: 'member',
+    createdAt: '2026-09-03T11:24:00.000Z',
+    remainingSpins: 2,
+    lastResetAt: Date.now(),
+    savedCoupons: [
+      {
+        id: 'sbux_dessert',
+        name: '스타벅스 달콤한 디저트 세트 (아메리카노 2잔 + 케이크)',
+        provider: '스타벅스',
+        discount: '세트 교환권',
+        couponCode: '8809 3921 4402 1194',
+        expiry: '2026-12-31',
+        wonAt: '2026-09-08 18:30',
+        isUsed: false
+      }
+    ]
+  },
+  {
+    id: 'user-002',
+    username: 'junho_park',
+    password: 'user1234!',
+    name: '박준호',
+    role: 'member',
+    createdAt: '2026-09-04T15:10:00.000Z',
+    remainingSpins: 1,
+    lastResetAt: Date.now(),
+    savedCoupons: [
+      {
+        id: 'bhc_bburing',
+        name: 'BHC 뿌링클 + 콜라 1.25L 세트 무료',
+        provider: 'BHC치킨',
+        discount: '치킨세트 FREE',
+        couponCode: '8809 5519 8271 3912',
+        expiry: '2026-11-30',
+        wonAt: '2026-09-07 20:15',
+        isUsed: true
+      }
+    ]
+  },
+  {
+    id: 'user-003',
+    username: 'soyeon_choi',
+    password: 'user1234!',
+    name: '최소연',
+    role: 'member',
+    createdAt: '2026-09-05T09:40:00.000Z',
+    remainingSpins: 3,
+    lastResetAt: Date.now(),
+    savedCoupons: [
+      {
+        id: 'shinsegae_50k',
+        name: '신세계백화점 상품권 50,000원권',
+        provider: '신세계',
+        discount: '50,000원권',
+        couponCode: '8809 9901 2283 5519',
+        expiry: '2026-12-31',
+        wonAt: '2026-09-08 14:02',
+        isUsed: false
+      }
+    ]
+  },
+  {
+    id: 'user-004',
+    username: 'dohyun_kim',
+    password: 'user1234!',
+    name: '김도현',
+    role: 'member',
+    createdAt: '2026-09-06T14:22:00.000Z',
+    remainingSpins: 0,
+    lastResetAt: Date.now(),
+    savedCoupons: [
+      {
+        id: 'baemin_10k',
+        name: '배달의민족 모바일 상품권 10,000원권',
+        provider: '배달의민족',
+        discount: '10,000원권',
+        couponCode: '8809 1239 8831 4920',
+        expiry: '2026-12-15',
+        wonAt: '2026-09-08 22:11',
+        isUsed: false
+      }
+    ]
+  },
+  {
+    id: 'user-005',
+    username: 'hyeonwoo_jung',
+    password: 'user1234!',
+    name: '정현우',
+    role: 'member',
+    createdAt: '2026-09-07T10:15:00.000Z',
+    remainingSpins: 2,
+    lastResetAt: Date.now(),
+    savedCoupons: []
+  },
+  {
+    id: 'user-006',
+    username: 'yujin_kang',
+    password: 'user1234!',
+    name: '강유진',
+    role: 'member',
+    createdAt: '2026-09-07T16:50:00.000Z',
+    remainingSpins: 1,
+    lastResetAt: Date.now(),
+    savedCoupons: []
+  },
+  {
+    id: 'user-007',
+    username: 'seungmin_yoon',
+    password: 'user1234!',
+    name: '윤승민',
+    role: 'member',
+    createdAt: '2026-09-08T08:30:00.000Z',
+    remainingSpins: 3,
+    lastResetAt: Date.now(),
+    savedCoupons: []
+  }
+];
+
 // 사용자 데이터 로드/저장
 function loadUsersData() {
   try {
     if (fs.existsSync(USERS_FILE)) {
-      return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+      const parsed = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+      if (parsed && Array.isArray(parsed.users) && parsed.users.length > 0) {
+        // taeiyoon 계정 항상 보장
+        const hasAdmin = parsed.users.some(u => u.username.toLowerCase() === 'taeiyoon');
+        if (!hasAdmin) {
+          parsed.users.unshift(DEFAULT_INITIAL_USERS[0]);
+          saveUsersData(parsed);
+        }
+        return parsed;
+      }
     }
   } catch (e) {
     logger.error('사용자 데이터 읽기 실패:', e);
   }
-  return { users: [] };
+
+  // 파일이 없거나 비어있으면 기본 데이터로 초기화
+  const initDb = { users: DEFAULT_INITIAL_USERS };
+  saveUsersData(initDb);
+  return initDb;
 }
 
 function saveUsersData(data) {
@@ -757,8 +905,151 @@ app.post('/api/admin/reset-user-spins', (req, res) => {
 
     logger.info(`👑 관리자가 ${target.username}의 스핀을 ${target.remainingSpins}회로 변경함`);
     res.json({ success: true, message: `${target.username}님의 스핀이 ${target.remainingSpins}회로 충전되었습니다!` });
+// 9) 20,000원 스핀 충전 API (모의 간편결제 시스템)
+app.post('/api/spin/recharge', (req, res) => {
+  try {
+    const { username, paymentMethod, amount, spins } = req.body;
+    if (!username) {
+      return res.status(401).json({ error: '로그인이 필요합니다.' });
+    }
+
+    const db = loadUsersData();
+    const user = db.users.find(u => u.username.toLowerCase() === String(username).toLowerCase());
+    if (!user) {
+      return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+    }
+
+    // 기본 20,000원에 10회 스핀 지급
+    const addCount = parseInt(spins, 10) || 10;
+    user.remainingSpins = (user.remainingSpins || 0) + addCount;
+    user.lastResetAt = Date.now();
+    if (!user.rechargeHistory) user.rechargeHistory = [];
+    user.rechargeHistory.unshift({
+      orderId: 'ORD-' + Date.now().toString(36).toUpperCase(),
+      name: '프리미엄 럭키 스핀 10회 패키지',
+      amount: amount || '20,000원',
+      spinsAdded: addCount,
+      paymentMethod: paymentMethod || '간편결제',
+      paidAt: new Date().toISOString()
+    });
+
+    saveUsersData(db);
+
+    logger.info(`💳 [결제승인] ${user.username} - 20,000원 결제 완료 (+${addCount}스핀, 수단: ${paymentMethod})`);
+
+    res.json({
+      success: true,
+      message: '20,000원 결제가 정상 승인되었습니다! 럭키 스핀 10회가 충전되었습니다.',
+      remainingSpins: user.role === 'admin' ? 999999 : user.remainingSpins,
+      spinsAdded: addCount
+    });
   } catch (e) {
-    res.status(500).json({ error: '스핀 충전 실패' });
+    logger.error('스핀 충전 처리 실패:', e);
+    res.status(500).json({ error: '결제 승인 처리 중 오류가 발생했습니다.' });
+  }
+});
+
+// 10) 실시간 생생 리뷰 시스템 API
+const REVIEWS_FILE = path.join(__dirname, 'reviews.json');
+const DEFAULT_REVIEWS = [
+  {
+    id: 1,
+    name: '이지* (서울 강남)',
+    badge: '신세계 상품권 50,000원',
+    rating: 5,
+    date: '방금 전',
+    text: '와 신세계 5만원권 진짜 뜸 ㄷㄷ 이마트 가서 장보고 왔습니다 ㅋㅋㅋ 매일 룰렛 돌린 보람이 있네요 최고입니다!',
+    likes: 142
+  },
+  {
+    id: 2,
+    name: '박준* (경기 수원)',
+    badge: 'BHC 뿌링클 + 콜라 세트',
+    rating: 5,
+    date: '3분 전',
+    text: 'BHC 뿌링클 치킨 세트 당첨 실화냐 ㅋㅋㅋ 오늘 저녁은 치킨이다 친구들한테 단톡방에 링크 다 뿌림 꿀맛',
+    likes: 98
+  },
+  {
+    id: 3,
+    name: '김민* (인천 부평)',
+    badge: '스타벅스 디저트 세트',
+    rating: 5,
+    date: '12분 전',
+    text: '출근길에 돌렸는데 스타벅스 디저트 세트 나옴!! 카운터에서 바코드 찍으니까 0원 결제되네요 매일 들어옵니다',
+    likes: 85
+  },
+  {
+    id: 4,
+    name: '최소* (부산 해운대)',
+    badge: '배달의민족 10,000원권',
+    rating: 5,
+    date: '25분 전',
+    text: '배민 1만원권 쿠폰 등록하니까 배민캐시로 바로 들어옴 ㅋㅋㅋ 점심 배달 시킬 때 잘 썼습니다 감사해요!',
+    likes: 67
+  },
+  {
+    id: 5,
+    name: '정현* (대전 유성)',
+    badge: '올리브영 20,000원권',
+    rating: 5,
+    date: '41분 전',
+    text: '올리브영 2만원권 개꿀... 화장품 하나 공짜로 건졌음 바코드도 선명하고 매장에서 1초만에 찍힘 대박',
+    likes: 54
+  },
+  {
+    id: 6,
+    name: '강유* (대구 수성)',
+    badge: 'GS25 바나나우유',
+    rating: 5,
+    date: '1시간 전',
+    text: '소소하게 바나나우유 당첨돼서 편의점 들러서 바꿔먹었어요 ㅋㅋ 꽝도 가끔 나오지만 무료라 넘 재밌음',
+    likes: 42
+  }
+];
+
+function loadReviewsData() {
+  try {
+    if (fs.existsSync(REVIEWS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(REVIEWS_FILE, 'utf8'));
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (e) {}
+  return DEFAULT_REVIEWS;
+}
+
+function saveReviewsData(data) {
+  try {
+    fs.writeFileSync(REVIEWS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {}
+}
+
+app.get('/api/reviews', (req, res) => {
+  res.json({ success: true, reviews: loadReviewsData() });
+});
+
+app.post('/api/reviews', (req, res) => {
+  try {
+    const { name, badge, rating, text } = req.body;
+    if (!text || !name) return res.status(400).json({ error: '작성자와 리뷰 내용을 입력해주세요.' });
+
+    const sanitize = (str) => String(str || '').replace(/<[^>]*>/g, '').substring(0, 300);
+    const reviews = loadReviewsData();
+    const newReview = {
+      id: Date.now(),
+      name: sanitize(name),
+      badge: sanitize(badge || '당첨 쿠폰'),
+      rating: parseInt(rating, 10) || 5,
+      date: '방금 전',
+      text: sanitize(text),
+      likes: 1
+    };
+    reviews.unshift(newReview);
+    saveReviewsData(reviews);
+
+    res.json({ success: true, review: newReview });
+  } catch (e) {
+    res.status(500).json({ error: '리뷰 등록 실패' });
   }
 });
 
