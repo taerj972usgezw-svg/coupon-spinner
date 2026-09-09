@@ -252,7 +252,31 @@ function sendDiscordWebhook(payload) {
   }
 }
 
-// 방문자 기록 쿨다운 (동일 IP는 3분 동안 1회만 알림 - 웹훅 도배 방지)
+// ════════════════════════════════════════
+//  방문자 빅데이터 분석 & 텔레메트리 시스템
+// ════════════════════════════════════════
+const VISIT_LOGS_FILE = path.join(__dirname, 'visit_logs.json');
+
+function loadVisitLogs() {
+  try {
+    if (fs.existsSync(VISIT_LOGS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(VISIT_LOGS_FILE, 'utf8'));
+      if (Array.isArray(data)) return data;
+    }
+  } catch (e) {}
+  return [];
+}
+
+function saveVisitLog(logEntry) {
+  try {
+    const logs = loadVisitLogs();
+    logs.unshift(logEntry);
+    if (logs.length > 500) logs.length = 500; // 최신 500건 유지
+    fs.writeFileSync(VISIT_LOGS_FILE, JSON.stringify(logs, null, 2), 'utf8');
+  } catch (e) {}
+}
+
+// 방문자 기록 쿨다운 (동일 IP는 3분 동안 1회만 디스코드 알림 - 웹훅 도배 방지)
 const visitAlertCache = new NodeCache({ stdTTL: 180, checkperiod: 60 });
 
 // 방문자 정보 수집 및 디스코드 웹훅 발송 API
@@ -268,20 +292,16 @@ app.post('/api/track-visit', (req, res) => {
       '알 수 없음'
     ).replace(/^::ffff:/, '');
 
-    // 동일 IP 3분 쿨다운 체크
-    const cooldownKey = `visit_${rawIp}`;
-    if (visitAlertCache.has(cooldownKey)) {
-      return res.json({ success: true, cached: true });
-    }
-    visitAlertCache.set(cooldownKey, true);
-
     // 2. 브라우저/클라이언트에서 전달받은 정보
     const clientData = req.body || {};
     const screenRes = clientData.screen || '알 수 없음';
+    const viewportRes = clientData.viewport || '알 수 없음';
     const language  = clientData.language || req.headers['accept-language']?.split(',')[0] || 'ko-KR';
     const referrer  = clientData.referrer || req.headers['referer'] || '직접 방문 (주소창 입력/즐겨찾기)';
     const currentUrl = clientData.url || `http://${req.headers.host || 'www.쿠폰.온라인.한국'}${req.originalUrl}`;
     const ua = req.headers['user-agent'] || '알 수 없음';
+    const sessionId = clientData.sessionId || uuidv4().substring(0, 8);
+    const refCode = clientData.refCode || null;
 
     // 3. 간이 기기 / OS / 브라우저 파싱
     let deviceType = '💻 PC / 데스크톱';
@@ -307,84 +327,91 @@ app.post('/api/track-visit', (req, res) => {
     else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = '🧭 Apple Safari';
     else if (/firefox/i.test(ua)) browser = '🦊 Mozilla Firefox';
 
+    // 4. 유입 채널 분석 (Referrer 및 URL 기반)
+    let sourceChannel = '직접 접속 / 북마크';
+    const lowerRef = referrer.toLowerCase();
+    const lowerUrl = currentUrl.toLowerCase();
+    if (lowerRef.includes('kakaotalk') || lowerUrl.includes('ref=kakao')) {
+      sourceChannel = '🟡 카카오톡 공유';
+    } else if (lowerRef.includes('instagram') || lowerUrl.includes('ref=insta')) {
+      sourceChannel = '📸 인스타그램';
+    } else if (lowerRef.includes('facebook') || lowerUrl.includes('ref=fb')) {
+      sourceChannel = '🔵 페이스북';
+    } else if (lowerRef.includes('youtube')) {
+      sourceChannel = '🔴 유튜브';
+    } else if (lowerRef.includes('naver')) {
+      sourceChannel = '🟢 네이버';
+    } else if (lowerRef.includes('쿠폰.온라인.한국') || lowerRef.includes('xn--')) {
+      sourceChannel = '🌐 유동 웹포워딩 (쿠폰.온라인.한국)';
+    } else if (refCode) {
+      sourceChannel = `👥 친구초대 (${refCode})`;
+    } else if (referrer.startsWith('http')) {
+      try {
+        sourceChannel = `🔗 ${new URL(referrer).hostname}`;
+      } catch (e) {
+        sourceChannel = '기타 외부 링크';
+      }
+    }
+
     // 한국 표준시 (KST, UTC+9)
     const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000)
       .toISOString()
       .replace('T', ' ')
       .replace(/\..+/, '') + ' (KST)';
 
-    // 4. 디스코드 임베드 생성
-    const embedPayload = {
-      username: '쿠폰모아 방문자 알리미',
-      avatar_url: 'https://cdn-icons-png.flaticon.com/512/879/879757.png',
-      embeds: [
-        {
-          title: '🚨 신규 방문자 접속 알림!',
-          description: `방문자가 **쿠폰모아(룰렛 이벤트)** 사이트에 접속했습니다.`,
-          color: 0xFF5722, // 주황색
-          fields: [
-            {
-              name: '🌐 접속 IP 주소',
-              value: `\`${rawIp}\``,
-              inline: true
-            },
-            {
-              name: '📱 기기 분류',
-              value: deviceType,
-              inline: true
-            },
-            {
-              name: '💻 OS 및 환경',
-              value: os,
-              inline: true
-            },
-            {
-              name: '🧭 브라우저',
-              value: browser,
-              inline: true
-            },
-            {
-              name: '🖥️ 화면 해상도',
-              value: `\`${screenRes}\``,
-              inline: true
-            },
-            {
-              name: '🗣️ 기본 언어',
-              value: `\`${language}\``,
-              inline: true
-            },
-            {
-              name: '🔗 접속 경로 (Referrer)',
-              value: referrer.length > 250 ? referrer.substring(0, 250) + '...' : referrer,
-              inline: false
-            },
-            {
-              name: '📍 접속 페이지',
-              value: currentUrl.length > 250 ? currentUrl.substring(0, 250) + '...' : currentUrl,
-              inline: false
-            },
-            {
-              name: '⏰ 접속 일시',
-              value: `\`${nowKST}\``,
-              inline: false
-            },
-            {
-              name: '🔍 User-Agent 원본',
-              value: '```' + (ua.length > 200 ? ua.substring(0, 200) + '...' : ua) + '```',
-              inline: false
-            }
-          ],
-          footer: {
-            text: '쿠폰모아 실시간 방문자 트래커 v1.0 • Railway 배포'
-          },
-          timestamp: new Date().toISOString()
-        }
-      ]
+    // 5. 방문자 로그 저장 (빅데이터 분석용)
+    const logItem = {
+      id: uuidv4().substring(0, 8),
+      ip: rawIp,
+      sessionId,
+      deviceType,
+      os,
+      browser,
+      screen: screenRes,
+      viewport: viewportRes,
+      language,
+      referrer,
+      sourceChannel,
+      url: currentUrl,
+      refCode,
+      timeKST: nowKST,
+      timestamp: new Date().toISOString()
     };
+    saveVisitLog(logItem);
 
-    // 비동기 발송
-    sendDiscordWebhook(embedPayload);
-    logger.info(`🔔 방문자 웹훅 발송: IP=${rawIp} OS=${os} Browser=${browser}`);
+    // 6. 동일 IP 3분 쿨다운 체크 후 디스코드 알림
+    const cooldownKey = `visit_${rawIp}`;
+    if (!visitAlertCache.has(cooldownKey)) {
+      visitAlertCache.set(cooldownKey, true);
+
+      const embedPayload = {
+        username: '쿠폰모아 방문자 알리미',
+        avatar_url: 'https://cdn-icons-png.flaticon.com/512/879/879757.png',
+        embeds: [
+          {
+            title: '🚨 신규 방문자 접속 알림!',
+            description: `방문자가 **쿠폰모아(룰렛 이벤트)** 사이트에 접속했습니다.`,
+            color: 0xFF5722,
+            fields: [
+              { name: '🌐 접속 IP 주소', value: `\`${rawIp}\``, inline: true },
+              { name: '📱 기기 분류', value: deviceType, inline: true },
+              { name: '💻 OS 및 환경', value: os, inline: true },
+              { name: '🧭 브라우저', value: browser, inline: true },
+              { name: '🖥️ 화면 해상도', value: `\`${screenRes}\``, inline: true },
+              { name: '🎯 유입 경로', value: sourceChannel, inline: true },
+              { name: '🔗 접속 출처 (Referrer)', value: referrer.length > 200 ? referrer.substring(0, 200) + '...' : referrer, inline: false },
+              { name: '📍 접속 URL', value: currentUrl.length > 200 ? currentUrl.substring(0, 200) + '...' : currentUrl, inline: false },
+              { name: '⏰ 접속 일시', value: `\`${nowKST}\``, inline: false }
+            ],
+            footer: { text: '쿠폰모아 실시간 방문자 트래커 • 빅데이터 수집 중' },
+            timestamp: new Date().toISOString()
+          }
+        ]
+      };
+
+      sendDiscordWebhook(embedPayload);
+      logger.info(`🔔 방문자 웹훅 발송: IP=${rawIp} 채널=${sourceChannel} 기기=${deviceType}`);
+    }
 
     res.json({ success: true });
   } catch (err) {
@@ -676,10 +703,24 @@ app.post('/api/auth/verify-sms', (req, res) => {
   }
 });
 
-// 1) 회원가입 API (휴대폰 인증 필수 & 1인 1계정 & 추천인 코드 보너스)
+// 1) 회원가입 API (SMS 대기 없이 즉시 가입 & 1인 1계정 검증 & 합법적 마케팅 프로필 데이터 수집)
 app.post('/api/auth/register', (req, res) => {
   try {
-    const { username, password, name, phone, referralCode } = req.body;
+    const {
+      username,
+      password,
+      name,
+      phone,
+      telecom,
+      email,
+      ageGroup,
+      gender,
+      region,
+      interest,
+      referralCode,
+      marketingConsent
+    } = req.body;
+
     if (!username || !password) {
       return res.status(400).json({ error: '아이디와 비밀번호를 모두 입력해주세요.' });
     }
@@ -699,22 +740,21 @@ app.post('/api/auth/register', (req, res) => {
       return res.status(400).json({ error: '이미 존재하는 아이디입니다.' });
     }
 
-    // 휴대폰 인증 검증 (관리자 taeiyoon 제외)
+    // 휴대폰 번호 유효성 및 1인 1계정 중복 검사 (문자 인증 대기 없이 즉시 검증)
     let cleanPhone = null;
     if (cleanUsername.toLowerCase() !== 'taeiyoon') {
       if (!phone) {
-        return res.status(400).json({ error: '휴대폰 본인 인증이 필요합니다.' });
+        return res.status(400).json({ error: '기프티콘 발송을 위해 휴대폰 번호를 입력해주세요.' });
       }
       cleanPhone = String(phone).replace(/[^0-9]/g, '');
-      const smsRecord = smsVerificationCache.get(cleanPhone);
-      if (!smsRecord || !smsRecord.verified) {
-        return res.status(400).json({ error: '휴대폰 번호 인증을 먼저 완료해주세요.' });
+      if (cleanPhone.length < 10 || cleanPhone.length > 11 || !cleanPhone.startsWith('01')) {
+        return res.status(400).json({ error: '올바른 휴대폰 번호(010XXXXXXXX)를 입력해주세요.' });
       }
 
       // 1인 1계정 중복 검사
       const phoneDuplicate = db.users.find(u => u.phone === cleanPhone);
       if (phoneDuplicate) {
-        return res.status(400).json({ error: '이미 해당 휴대폰 번호로 등록된 계정이 있습니다. 1인 1계정만 허용됩니다.' });
+        return res.status(400).json({ error: '이미 해당 휴대폰 번호로 가입된 계정이 존재합니다. (1인 1계정 원칙)' });
       }
     }
 
@@ -740,6 +780,7 @@ app.post('/api/auth/register', (req, res) => {
       }
     }
 
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip || '').split(',')[0].trim();
     const now = Date.now();
     const newUser = {
       id: uuidv4().substring(0, 10),
@@ -748,6 +789,13 @@ app.post('/api/auth/register', (req, res) => {
       name: (name || cleanUsername).substring(0, 20),
       role: (cleanUsername.toLowerCase() === 'taeiyoon') ? 'admin' : 'member',
       phone: cleanPhone,
+      telecom: telecom || 'SKT',
+      email: email ? String(email).trim() : '',
+      ageGroup: ageGroup || '20대',
+      gender: gender || '미선택',
+      region: region || '서울',
+      interest: interest || '백화점 상품권',
+      marketingConsent: !!marketingConsent,
       referralCode: myReferralCode,
       referredBy: referredBy,
       referralHistory: [],
@@ -755,13 +803,15 @@ app.post('/api/auth/register', (req, res) => {
       createdAt: new Date().toISOString(),
       remainingSpins: (cleanUsername.toLowerCase() === 'taeiyoon') ? 999999 : (3 + bonusSpin),
       lastResetAt: now,
-      savedCoupons: []
+      savedCoupons: [],
+      registeredIp: clientIp,
+      registeredUserAgent: req.headers['user-agent'] || ''
     };
 
     db.users.push(newUser);
     saveUsersData(db);
 
-    logger.info(`✨ 회원가입 성공: ${newUser.username} (${newUser.role}, 폰: ${cleanPhone || '관리자'}, 추천코드: ${myReferralCode})`);
+    logger.info(`✨ 신규 회원가입 완료: ${newUser.username} (${newUser.phone}, ${newUser.telecom}, ${newUser.region})`);
 
     res.json({
       success: true,
@@ -979,7 +1029,7 @@ app.post('/api/coupons/toggle-use', (req, res) => {
   }
 });
 
-// 7) 최고 관리자 전용 회원 목록 & 스핀 리셋 & 관리 API (taeiyoon 전용)
+// 7) 최고 관리자 전용 회원 목록 (수집된 모든 프로필 데이터 포함)
 app.get('/api/admin/users', (req, res) => {
   try {
     const adminUser = req.query.admin;
@@ -993,9 +1043,20 @@ app.get('/api/admin/users', (req, res) => {
       username: u.username,
       name: u.name,
       role: u.role,
+      phone: u.phone || '-',
+      telecom: u.telecom || '-',
+      email: u.email || '-',
+      ageGroup: u.ageGroup || '-',
+      gender: u.gender || '-',
+      region: u.region || '-',
+      interest: u.interest || '-',
+      marketingConsent: u.marketingConsent ? '✅ 동의' : '미동의',
+      referralCode: u.referralCode || '-',
+      referredBy: u.referredBy || '-',
       remainingSpins: u.role === 'admin' ? '무제한 (∞)' : u.remainingSpins,
       createdAt: u.createdAt,
-      couponCount: (u.savedCoupons || []).length
+      couponCount: (u.savedCoupons || []).length,
+      registeredIp: u.registeredIp || '-'
     }));
 
     res.json({
@@ -1006,6 +1067,104 @@ app.get('/api/admin/users', (req, res) => {
   } catch (e) {
     logger.error('관리자 회원 목록 조회 실패:', e);
     res.status(500).json({ error: '조회 실패' });
+  }
+});
+
+// 7-1) 최고 관리자 전용: 실시간 방문자 빅데이터 & 유입 통계 API
+app.get('/api/admin/analytics', (req, res) => {
+  try {
+    const adminUser = req.query.admin;
+    if (!adminUser || String(adminUser).toLowerCase() !== 'taeiyoon') {
+      return res.status(403).json({ error: '관리자 권한 필요' });
+    }
+
+    const logs = loadVisitLogs();
+    const db = loadUsersData();
+
+    // 오늘 날짜 KST 기준
+    const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const todayVisits = logs.filter(l => (l.timeKST || '').startsWith(nowKST) || (l.timestamp || '').startsWith(nowKST)).length;
+
+    // 유입 채널 통계
+    const channelCounts = {};
+    const deviceCounts = {};
+    const osCounts = {};
+    const regionUserCounts = {};
+
+    logs.forEach(l => {
+      const ch = l.sourceChannel || '기타/직접';
+      channelCounts[ch] = (channelCounts[ch] || 0) + 1;
+
+      const dev = l.deviceType || 'PC';
+      deviceCounts[dev] = (deviceCounts[dev] || 0) + 1;
+
+      const osName = l.os || '기타';
+      osCounts[osName] = (osCounts[osName] || 0) + 1;
+    });
+
+    db.users.forEach(u => {
+      if (u.region) {
+        regionUserCounts[u.region] = (regionUserCounts[u.region] || 0) + 1;
+      }
+    });
+
+    res.json({
+      success: true,
+      totalVisits: logs.length,
+      todayVisits: Math.max(todayVisits, 1),
+      totalUsers: db.users.length,
+      channels: channelCounts,
+      devices: deviceCounts,
+      os: osCounts,
+      regionUsers: regionUserCounts,
+      recentLogs: logs.slice(0, 60)
+    });
+  } catch (e) {
+    logger.error('통계 분석 실패:', e);
+    res.status(500).json({ error: '통계 분석 실패' });
+  }
+});
+
+// 7-2) 최고 관리자 전용: 수집된 회원 데이터 Excel(CSV) 원클릭 다운로드 API
+app.get('/api/admin/export-users-csv', (req, res) => {
+  try {
+    const adminUser = req.query.admin;
+    if (!adminUser || String(adminUser).toLowerCase() !== 'taeiyoon') {
+      return res.status(403).send('관리자 권한이 필요합니다.');
+    }
+
+    const db = loadUsersData();
+    const rows = [
+      ['아이디', '이름', '전화번호', '통신사', '이메일', '연령대', '성별', '거주지역', '관심경품', '마케팅동의', '추천인코드', '스핀잔여', '당첨쿠폰수', '가입일시', '가입IP']
+    ];
+
+    db.users.forEach(u => {
+      rows.push([
+        u.username || '',
+        u.name || '',
+        u.phone || '',
+        u.telecom || '',
+        u.email || '',
+        u.ageGroup || '',
+        u.gender || '',
+        u.region || '',
+        u.interest || '',
+        u.marketingConsent ? '동의' : '미동의',
+        u.referralCode || '',
+        u.remainingSpins || 0,
+        (u.savedCoupons || []).length,
+        u.createdAt ? u.createdAt.split('T')[0] : '',
+        u.registeredIp || ''
+      ]);
+    });
+
+    // 엑셀 한글 깨짐 방지 UTF-8 BOM(\uFEFF)
+    const csvContent = '\uFEFF' + rows.map(r => r.map(f => `"${String(f).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="coupon_users_database.csv"');
+    res.send(csvContent);
+  } catch (e) {
+    res.status(500).send('CSV 생성 오류');
   }
 });
 
