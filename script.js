@@ -1628,7 +1628,7 @@ async function processFakePayment() {
       body: JSON.stringify({
         username: currentUser.username,
         amount: 20000,
-        spins: 10,
+        spins: 1,
         payMethod: selectedPayMethod
       })
     });
@@ -1638,7 +1638,7 @@ async function processFakePayment() {
       remainingSpins = data.remainingSpins;
       updateSpinsDisplay();
       closeRechargeModal();
-      showToast(`🎉 20,000원 결제 성공! 스핀 10회가 충전되었습니다! (총 ${remainingSpins}회)`);
+      showToast(`🎉 20,000원 결제 성공! 스핀 1회가 충전되었습니다! (총 ${remainingSpins}회)`);
       playWinFanfare();
     } else {
       showToast(data.error || '결제 처리에 실패했습니다.');
@@ -1819,7 +1819,7 @@ const FAQ_ANSWERS = {
   use: `🏪 <strong>매장 현장 사용 방법</strong><br>
 보관함에 저장된 쿠폰의 <strong>[바코드]</strong> 또는 <strong>[이미지 다운로드]</strong>를 누른 후, 전국 신세계백화점, BHC, 스타벅스, 배민, 편의점 매장 카운터/키오스크/공식앱에서 바코드를 스캔 또는 쿠폰번호를 등록하시면 0원에 즉시 교환 및 결제됩니다!`,
   recharge: `⚡ <strong>스핀 추가 충전 안내</strong><br>
-일일 무료 기회 3회를 모두 사용하셨다면, 룰렛 우측 하단의 <strong>[⚡ 스핀 10회 즉시 충전 (20,000원)]</strong> 버튼을 통해 간편결제(카카오페이/토스/네이버페이/카드)로 10회를 즉시 충전받으실 수 있습니다!`,
+일일 무료 기회 3회를 모두 사용하셨다면, 룰렛 우측 하단의 <strong>[⚡ 스핀 1회 즉시 충전 (20,000원)]</strong> 버튼을 통해 간편결제(카카오페이/토스/네이버페이/카드)로 스핀 1회를 즉시 충전받으실 수 있습니다!`,
   cooldown: `⏳ <strong>24시간 쿨타임 시스템</strong><br>
 쿠폰모아는 모든 회원님들에게 공정한 당첨 기회를 제공하기 위해 24시간마다 매일 자정에 무료 뽑기 3회가 자동으로 100% 충전됩니다.`
 };
