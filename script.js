@@ -231,6 +231,10 @@ document.addEventListener('DOMContentLoaded', () => {
   bindAllClickEvents();
   loadLiveReviews();
   initLiveWinnerToasts();
+  loadRankingBoard();
+  setInterval(loadRankingBoard, 40000);
+  loadAttendanceStatus();
+  checkReferralQueryParam();
 });
 
 // ── 4. Web Audio 사운드 신디사이저 ──
@@ -389,6 +393,7 @@ function applyUserUI(user) {
   if (promptBox) promptBox.style.display = 'none';
 
   updateSpinsDisplay();
+  loadAttendanceStatus();
 }
 
 function applyGuestUI() {
@@ -410,6 +415,7 @@ function applyGuestUI() {
   updateVaultBadges();
   renderMyVaultGrid();
   updateSpinsDisplay();
+  loadAttendanceStatus();
 }
 
 // 서버와 24시간 스핀 상태 동기화
@@ -651,8 +657,14 @@ function bindAllClickEvents() {
   bindElementAction('floatingChatBtn', () => openChatModal());
   bindElementAction('btnCloseChatModal', () => closeChatModal());
 
+  // 출석체크 & SMS 인증 & 친구초대 모달 안전 바인딩
+  bindElementAction('btnCheckAttendance', () => doAttendanceCheck());
+  bindElementAction('btnSendSms', () => sendRegisterSms());
+  bindElementAction('btnVerifySms', () => verifyRegisterSms());
+  bindElementAction('btnCloseReferralModal', () => closeReferralModal());
+
   // 모달 바깥 배경 터치/클릭 시 닫기
-  ['loginModal', 'registerModal', 'adminModal', 'winModal', 'rechargeModal', 'reviewModal', 'chatModal'].forEach(modalId => {
+  ['loginModal', 'registerModal', 'adminModal', 'winModal', 'rechargeModal', 'reviewModal', 'chatModal', 'referralModal'].forEach(modalId => {
     const m = document.getElementById(modalId);
     if (m) {
       m.addEventListener('click', (e) => {
@@ -678,6 +690,9 @@ function bindAllClickEvents() {
   bindEnter('regUsername', submitRegister);
   bindEnter('regName', submitRegister);
   bindEnter('regPassword', submitRegister);
+  bindEnter('regPhone', sendRegisterSms);
+  bindEnter('regSmsCode', verifyRegisterSms);
+  bindEnter('regReferralCode', submitRegister);
 }
 
 function bindElementAction(elemId, handler) {
@@ -1334,10 +1349,55 @@ function closeLoginModal() {
   document.body.style.overflow = '';
 }
 
+let isSmsVerified = false;
+let verifiedPhone = '';
+let smsCountdownTimer = null;
+let smsCountdownSeconds = 180;
+
+function resetSmsState() {
+  isSmsVerified = false;
+  verifiedPhone = '';
+  if (smsCountdownTimer) {
+    clearInterval(smsCountdownTimer);
+    smsCountdownTimer = null;
+  }
+  const field = document.getElementById('smsCodeField');
+  if (field) field.style.display = 'none';
+  const badge = document.getElementById('smsVerifiedBadge');
+  if (badge) badge.style.display = 'none';
+  const phoneInput = document.getElementById('regPhone');
+  if (phoneInput) {
+    phoneInput.disabled = false;
+    phoneInput.value = '';
+  }
+  const codeInput = document.getElementById('regSmsCode');
+  if (codeInput) {
+    codeInput.disabled = false;
+    codeInput.value = '';
+  }
+  const btnSend = document.getElementById('btnSendSms');
+  if (btnSend) {
+    btnSend.disabled = false;
+    btnSend.textContent = '인증번호 전송';
+  }
+  const btnVerify = document.getElementById('btnVerifySms');
+  if (btnVerify) {
+    btnVerify.disabled = false;
+    btnVerify.textContent = '인증 확인';
+  }
+}
+
 function openRegisterModal() {
+  resetSmsState();
   const m = document.getElementById('registerModal');
   if (m) {
     m.classList.add('active');
+    // URL 추천인 코드 파라미터가 있다면 자동 채우기
+    const pendingRef = sessionStorage.getItem('pending_ref_code');
+    const refInput = document.getElementById('regReferralCode');
+    if (pendingRef && refInput) {
+      refInput.value = pendingRef;
+    }
     setTimeout(() => {
       const u = document.getElementById('regUsername');
       if (u) u.focus();
@@ -1360,6 +1420,157 @@ function switchToRegister() {
 function switchToLogin() {
   closeRegisterModal();
   setTimeout(openLoginModal, 150);
+}
+
+// ── SMS 휴대폰 모의 본인인증 (1인 1계정 검증) ──
+async function sendRegisterSms() {
+  const phoneInput = document.getElementById('regPhone');
+  const phone = phoneInput ? phoneInput.value.replace(/[^0-9]/g, '') : '';
+
+  if (!phone || phone.length < 10 || phone.length > 11 || !phone.startsWith('01')) {
+    showToast('⚠️ 올바른 휴대폰 번호(01012345678)를 입력해주세요.');
+    return;
+  }
+
+  const btnSend = document.getElementById('btnSendSms');
+  if (btnSend) {
+    btnSend.disabled = true;
+    btnSend.textContent = '발송 중...';
+  }
+
+  try {
+    const res = await fetch('/api/auth/send-sms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone })
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showToast(data.error || '인증번호 발송에 실패했습니다.');
+      if (btnSend) {
+        btnSend.disabled = false;
+        btnSend.textContent = '인증번호 전송';
+      }
+      return;
+    }
+
+    showToast(`📲 [인증번호 발송] ${data.message}`);
+    if (data.mockCode) {
+      setTimeout(() => {
+        showToast(`💡 발송된 인증번호: [${data.mockCode}]`);
+      }, 1000);
+      const codeInput = document.getElementById('regSmsCode');
+      if (codeInput) codeInput.value = data.mockCode;
+    }
+
+    const field = document.getElementById('smsCodeField');
+    if (field) field.style.display = 'block';
+
+    if (btnSend) {
+      btnSend.disabled = false;
+      btnSend.textContent = '재발송';
+    }
+
+    // 3분(180초) 타이머 시작
+    if (smsCountdownTimer) clearInterval(smsCountdownTimer);
+    smsCountdownSeconds = 180;
+    updateSmsTimerUI();
+    smsCountdownTimer = setInterval(() => {
+      smsCountdownSeconds--;
+      if (smsCountdownSeconds <= 0) {
+        clearInterval(smsCountdownTimer);
+        smsCountdownTimer = null;
+        const timerEl = document.getElementById('smsTimerText');
+        if (timerEl) timerEl.textContent = '시간만료';
+      } else {
+        updateSmsTimerUI();
+      }
+    }, 1000);
+
+  } catch (err) {
+    showToast('인증번호 발송 중 서버 통신 오류가 발생했습니다.');
+    if (btnSend) {
+      btnSend.disabled = false;
+      btnSend.textContent = '인증번호 전송';
+    }
+  }
+}
+
+function updateSmsTimerUI() {
+  const timerEl = document.getElementById('smsTimerText');
+  if (!timerEl) return;
+  const m = String(Math.floor(smsCountdownSeconds / 60)).padStart(2, '0');
+  const s = String(smsCountdownSeconds % 60).padStart(2, '0');
+  timerEl.textContent = `${m}:${s}`;
+}
+
+async function verifyRegisterSms() {
+  const phoneInput = document.getElementById('regPhone');
+  const codeInput = document.getElementById('regSmsCode');
+  const phone = phoneInput ? phoneInput.value.replace(/[^0-9]/g, '') : '';
+  const code = codeInput ? codeInput.value.trim() : '';
+
+  if (!phone) {
+    showToast('휴대폰 번호를 입력해주세요.');
+    return;
+  }
+  if (!code || code.length !== 6) {
+    showToast('6자리 인증번호를 정확히 입력해주세요.');
+    return;
+  }
+
+  const btnVerify = document.getElementById('btnVerifySms');
+  if (btnVerify) {
+    btnVerify.disabled = true;
+    btnVerify.textContent = '확인 중...';
+  }
+
+  try {
+    const res = await fetch('/api/auth/verify-sms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, code })
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showToast(data.error || '인증번호가 일치하지 않습니다.');
+      if (btnVerify) {
+        btnVerify.disabled = false;
+        btnVerify.textContent = '인증 확인';
+      }
+      return;
+    }
+
+    // 인증 성공
+    isSmsVerified = true;
+    verifiedPhone = phone;
+    if (smsCountdownTimer) {
+      clearInterval(smsCountdownTimer);
+      smsCountdownTimer = null;
+    }
+
+    if (phoneInput) phoneInput.disabled = true;
+    if (codeInput) codeInput.disabled = true;
+    const btnSend = document.getElementById('btnSendSms');
+    if (btnSend) btnSend.disabled = true;
+    if (btnVerify) {
+      btnVerify.disabled = true;
+      btnVerify.textContent = '인증완료';
+    }
+
+    const badge = document.getElementById('smsVerifiedBadge');
+    if (badge) badge.style.display = 'block';
+
+    showToast('✅ 휴대폰 본인인증 완료! (1인 1계정 확인됨)');
+  } catch (err) {
+    showToast('인증 확인 중 통신 오류가 발생했습니다.');
+    if (btnVerify) {
+      btnVerify.disabled = false;
+      btnVerify.textContent = '인증 확인';
+    }
+  }
 }
 
 // 로그인 제출
@@ -1410,9 +1621,12 @@ async function submitRegister() {
   const uInput = document.getElementById('regUsername');
   const nInput = document.getElementById('regName');
   const pInput = document.getElementById('regPassword');
+  const refInput = document.getElementById('regReferralCode');
+
   const username = uInput ? uInput.value.trim() : '';
   const name = nInput ? nInput.value.trim() : '';
   const password = pInput ? pInput.value.trim() : '';
+  const referralCode = refInput ? refInput.value.trim() : '';
 
   if (!username || !password) {
     showToast('아이디와 비밀번호를 모두 입력해주세요.');
@@ -1427,11 +1641,23 @@ async function submitRegister() {
     return;
   }
 
+  // 1인 1계정 휴대폰 본인인증 체크
+  if (!isSmsVerified || !verifiedPhone) {
+    showToast('⚠️ 휴대폰 번호 인증을 완료해주세요! (1인 1계정 원칙)');
+    return;
+  }
+
   try {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, name, password })
+      body: JSON.stringify({
+        username,
+        name,
+        password,
+        phone: verifiedPhone,
+        referralCode
+      })
     });
     const data = await res.json();
 
@@ -1440,7 +1666,12 @@ async function submitRegister() {
       return;
     }
 
-    showToast('✨ 회원가입 성공! 가입하신 아이디로 로그인해주세요.');
+    if (data.bonusSpins && data.bonusSpins > 0) {
+      showToast(`🎉 회원가입 성공! 추천인 혜택으로 +${data.bonusSpins}회 보너스 스핀이 지급되었습니다!`);
+    } else {
+      showToast('✨ 회원가입 성공! 가입하신 아이디로 로그인해주세요.');
+    }
+
     closeRegisterModal();
     setTimeout(() => {
       const loginU = document.getElementById('loginUsername');
@@ -1984,6 +2215,278 @@ window.openChatModal = openChatModal;
 window.closeChatModal = closeChatModal;
 window.askChatBot = askChatBot;
 window.sendChatMessage = sendChatMessage;
+// ── 26. 매일매일 출석체크 & 스탬프 달력 로직 ──
+async function loadAttendanceStatus() {
+  const streakEl = document.getElementById('attendanceStreakCount');
+  const btnCheck = document.getElementById('btnCheckAttendance');
+  const grid = document.getElementById('attendanceGrid');
+
+  if (!currentUser) {
+    if (streakEl) streakEl.textContent = '0';
+    if (btnCheck) {
+      btnCheck.disabled = false;
+      btnCheck.innerHTML = '<span class="btn-check-icon">쾅!</span><span>출석체크 하고 스핀 받기</span>';
+    }
+    if (grid) {
+      const items = grid.querySelectorAll('.stamp-item');
+      items.forEach((item, idx) => {
+        item.classList.remove('checked', 'today');
+        if (idx === 0) item.classList.add('today');
+      });
+    }
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/attendance/status?username=${encodeURIComponent(currentUser.username)}`);
+    const data = await res.json();
+    if (!data.success) return;
+
+    const streak = data.streak || 0;
+    const checkedToday = !!data.checkedToday;
+
+    if (streakEl) streakEl.textContent = streak;
+
+    if (grid) {
+      const items = grid.querySelectorAll('.stamp-item');
+      const activeDay = ((streak - 1) % 7) + 1; // 1 ~ 7
+      items.forEach((item, idx) => {
+        const day = idx + 1;
+        item.classList.remove('checked', 'today');
+
+        if (checkedToday) {
+          if (day <= activeDay) {
+            item.classList.add('checked');
+          }
+        } else {
+          const prevDay = (streak % 7);
+          if (day <= prevDay) {
+            item.classList.add('checked');
+          }
+          if (day === prevDay + 1) {
+            item.classList.add('today');
+          }
+        }
+      });
+    }
+
+    if (btnCheck) {
+      if (checkedToday) {
+        btnCheck.disabled = true;
+        btnCheck.innerHTML = '<span>✅ 오늘 출석 완료! (내일 또 만나요)</span>';
+      } else {
+        btnCheck.disabled = false;
+        btnCheck.innerHTML = '<span class="btn-check-icon">쾅!</span><span>오늘 출석도장 찍기</span>';
+      }
+    }
+  } catch (err) {
+    console.error('출석체크 상태 조회 오류:', err);
+  }
+}
+
+async function doAttendanceCheck() {
+  if (!currentUser) {
+    showToast('⚠️ 출석체크를 위해 먼저 로그인해주세요.');
+    openLoginModal();
+    return;
+  }
+
+  const btnCheck = document.getElementById('btnCheckAttendance');
+  if (btnCheck) btnCheck.disabled = true;
+
+  try {
+    const res = await fetch('/api/attendance/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: currentUser.username })
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showToast(data.error || '출석체크에 실패했습니다.');
+      loadAttendanceStatus();
+      return;
+    }
+
+    showToast(`🎉 ${data.message}`);
+    if (data.bonusSpins > 0) {
+      syncSpinStatusFromServer();
+    }
+    loadAttendanceStatus();
+  } catch (err) {
+    showToast('출석체크 중 통신 오류가 발생했습니다.');
+    if (btnCheck) btnCheck.disabled = false;
+  }
+}
+
+// ── 27. 실시간 명예의 전당 & 럭키 랭킹 ──
+async function loadRankingBoard() {
+  const podium = document.getElementById('podiumGrid');
+  const tbody = document.getElementById('rankingTableBody');
+  if (!podium && !tbody) return;
+
+  try {
+    const res = await fetch('/api/ranking');
+    const data = await res.json();
+    if (!data.success || !Array.isArray(data.ranking)) return;
+
+    const ranking = data.ranking;
+
+    // 1위, 2위, 3위 포디움 렌더링
+    if (podium && ranking.length >= 3) {
+      const rank1 = ranking[0];
+      const rank2 = ranking[1];
+      const rank3 = ranking[2];
+
+      podium.innerHTML = `
+        <div class="podium-card rank-2">
+          <span class="podium-crown">🥈</span>
+          <span class="podium-rank-badge podium-rank-2">2위 SILVER</span>
+          <div class="podium-user">${escapeHtml(rank2.maskedPhone || rank2.username)}</div>
+          <div class="podium-prize">${escapeHtml(rank2.couponName)}</div>
+          <div class="podium-amount">${escapeHtml(rank2.couponValue)}</div>
+          <div class="podium-time">${escapeHtml(rank2.formattedTime)}</div>
+        </div>
+
+        <div class="podium-card rank-1">
+          <span class="podium-crown">👑</span>
+          <span class="podium-rank-badge podium-rank-1">1위 챔피언 GOLD</span>
+          <div class="podium-user">${escapeHtml(rank1.maskedPhone || rank1.username)}</div>
+          <div class="podium-prize">${escapeHtml(rank1.couponName)}</div>
+          <div class="podium-amount">${escapeHtml(rank1.couponValue)}</div>
+          <div class="podium-time">${escapeHtml(rank1.formattedTime)}</div>
+        </div>
+
+        <div class="podium-card rank-3">
+          <span class="podium-crown">🥉</span>
+          <span class="podium-rank-badge podium-rank-3">3위 BRONZE</span>
+          <div class="podium-user">${escapeHtml(rank3.maskedPhone || rank3.username)}</div>
+          <div class="podium-prize">${escapeHtml(rank3.couponName)}</div>
+          <div class="podium-amount">${escapeHtml(rank3.couponValue)}</div>
+          <div class="podium-time">${escapeHtml(rank3.formattedTime)}</div>
+        </div>
+      `;
+    }
+
+    // 4위 ~ 10위 테이블 렌더링
+    if (tbody) {
+      const rest = ranking.slice(3, 10);
+      if (rest.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#888;">집계된 랭킹 데이터가 없습니다.</td></tr>';
+      } else {
+        tbody.innerHTML = rest.map((item, i) => `
+          <tr>
+            <td><span class="table-rank-pill">${i + 4}</span></td>
+            <td><strong>${escapeHtml(item.maskedPhone || item.username)}</strong></td>
+            <td>${escapeHtml(item.couponName)}</td>
+            <td><strong style="color:#00E676;">${escapeHtml(item.couponValue)}</strong></td>
+            <td style="color:#8B95A1; font-size:0.8rem;">${escapeHtml(item.formattedTime)}</td>
+          </tr>
+        `).join('');
+      }
+    }
+  } catch (err) {
+    console.error('랭킹 데이터 로드 오류:', err);
+  }
+}
+
+// ── 28. 친구 초대 & 추천인 코드 시스템 ──
+let myCurrentReferralCode = '';
+
+async function openReferralModal() {
+  if (!currentUser) {
+    showToast('⚠️ 친구 초대를 위해 먼저 로그인해주세요.');
+    openLoginModal();
+    return;
+  }
+
+  const modal = document.getElementById('referralModal');
+  if (modal) modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+
+  const codeEl = document.getElementById('myReferralCodeText');
+  const invitedEl = document.getElementById('refTotalInvited');
+  const spinsEl = document.getElementById('refEarnedSpins');
+
+  // 기본 표시
+  myCurrentReferralCode = currentUser.referralCode || ('MOA-' + currentUser.username.toUpperCase());
+  if (codeEl) codeEl.textContent = myCurrentReferralCode;
+
+  try {
+    const res = await fetch(`/api/referral/stats?username=${encodeURIComponent(currentUser.username)}`);
+    const data = await res.json();
+    if (data.success) {
+      myCurrentReferralCode = data.referralCode;
+      if (codeEl) codeEl.textContent = data.referralCode;
+      if (invitedEl) invitedEl.textContent = `${data.referralCount}명`;
+      if (spinsEl) spinsEl.textContent = `${data.earnedSpins}회`;
+    }
+  } catch (err) {
+    console.error('추천인 통계 조회 오류:', err);
+  }
+}
+
+function closeReferralModal() {
+  const modal = document.getElementById('referralModal');
+  if (modal) modal.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function copyMyReferralCode() {
+  const code = myCurrentReferralCode || (currentUser ? (currentUser.referralCode || ('MOA-' + currentUser.username.toUpperCase())) : '');
+  if (!code) return;
+  navigator.clipboard.writeText(code).then(() => {
+    showToast(`📋 추천인 코드 [${code}]가 복사되었습니다!`);
+  }).catch(() => {
+    prompt('추천인 코드를 복사하세요:', code);
+  });
+}
+
+function copyReferralLink() {
+  const code = myCurrentReferralCode || (currentUser ? (currentUser.referralCode || ('MOA-' + currentUser.username.toUpperCase())) : '');
+  const url = `${window.location.origin}/?ref=${encodeURIComponent(code)}`;
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('🔗 초대 전용 링크가 복사되었습니다! 친구에게 공유해보세요.');
+  }).catch(() => {
+    prompt('초대 링크를 복사하세요:', url);
+  });
+}
+
+function shareReferralKakao() {
+  const code = myCurrentReferralCode || (currentUser ? (currentUser.referralCode || ('MOA-' + currentUser.username.toUpperCase())) : '');
+  const shareText = `[쿠폰모아] 친구야! 룰렛만 돌려도 신세계 5만원, BHC치킨, 스타벅스 100% 무료 당첨! 내 추천인 코드 [${code}] 입력하고 가입하면 스핀 1회 즉시 보너스 지급!\n\n바로가기: ${window.location.origin}/?ref=${encodeURIComponent(code)}`;
+  
+  navigator.clipboard.writeText(shareText).then(() => {
+    showToast('🟡 카카오톡 공유용 초대 문구가 복사되었습니다! 카톡 채팅방에 붙여넣기 해보세요.');
+  }).catch(() => {
+    prompt('카카오톡 초대 문구:', shareText);
+  });
+}
+
+function checkReferralQueryParam() {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const ref = urlParams.get('ref');
+    if (ref) {
+      sessionStorage.setItem('pending_ref_code', ref);
+      const regRef = document.getElementById('regReferralCode');
+      if (regRef) regRef.value = ref;
+    }
+  } catch (e) {}
+}
+
+// 신규 기능 전역 함수 바인딩
+window.loadAttendanceStatus = loadAttendanceStatus;
+window.doAttendanceCheck = doAttendanceCheck;
+window.loadRankingBoard = loadRankingBoard;
+window.openReferralModal = openReferralModal;
+window.closeReferralModal = closeReferralModal;
+window.copyMyReferralCode = copyMyReferralCode;
+window.copyReferralLink = copyReferralLink;
+window.shareReferralKakao = shareReferralKakao;
+window.sendRegisterSms = sendRegisterSms;
+window.verifyRegisterSms = verifyRegisterSms;
+window.checkReferralQueryParam = checkReferralQueryParam;
 
 // ── 25. 방문자 통계 및 디스코드 웹훅 연동 ──
 (function trackVisitor() {
