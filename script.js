@@ -229,6 +229,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderCouponWheel();
   renderLineupTeaser();
   bindAllClickEvents();
+  loadLiveReviews();
+  initLiveWinnerToasts();
 });
 
 // ── 4. Web Audio 사운드 신디사이저 ──
@@ -487,12 +489,14 @@ function updateSpinsDisplay() {
   const barEl = document.getElementById('chanceProgressBar');
   const unitEl = document.getElementById('spinUnitText');
   const labelEl = document.getElementById('chanceLabelText');
+  const rechargeRow = document.getElementById('chanceRechargeRow');
 
   if (isUnlimited) {
     if (spinsEl) spinsEl.textContent = '∞';
     if (unitEl) unitEl.textContent = ' (무제한)';
     if (barEl) barEl.style.width = '100%';
     if (labelEl) labelEl.textContent = '👑 관리자 권한 (스핀 무제한)';
+    if (rechargeRow) rechargeRow.style.display = 'none';
     return;
   }
 
@@ -502,6 +506,7 @@ function updateSpinsDisplay() {
   if (!currentUser) {
     if (spinsEl) spinsEl.textContent = '0';
     if (barEl) barEl.style.width = '0%';
+    if (rechargeRow) rechargeRow.style.display = 'none';
     return;
   }
 
@@ -510,6 +515,9 @@ function updateSpinsDisplay() {
   if (barEl) {
     const pct = Math.min(100, Math.max(0, (currentCount / 3) * 100));
     barEl.style.width = pct + '%';
+  }
+  if (rechargeRow) {
+    rechargeRow.style.display = 'block';
   }
 }
 
@@ -630,8 +638,21 @@ function bindAllClickEvents() {
   bindElementAction('btnAdminRecharge', () => adminRechargeUserSpins());
   bindElementAction('btnAdminRefresh', () => loadAdminUserList());
 
+  // 충전 모달 안전 바인딩
+  bindElementAction('btnOpenRecharge', () => openRechargeModal());
+  bindElementAction('btnCloseRechargeModal', () => closeRechargeModal());
+  bindElementAction('btnSubmitPayment', () => processFakePayment());
+
+  // 리뷰 모달 안전 바인딩
+  bindElementAction('btnWriteReview', () => openReviewModal());
+  bindElementAction('btnCloseReviewModal', () => closeReviewModal());
+
+  // 상담톡 모달 안전 바인딩
+  bindElementAction('floatingChatBtn', () => openChatModal());
+  bindElementAction('btnCloseChatModal', () => closeChatModal());
+
   // 모달 바깥 배경 터치/클릭 시 닫기
-  ['loginModal', 'registerModal', 'adminModal', 'winModal'].forEach(modalId => {
+  ['loginModal', 'registerModal', 'adminModal', 'winModal', 'rechargeModal', 'reviewModal', 'chatModal'].forEach(modalId => {
     const m = document.getElementById(modalId);
     if (m) {
       m.addEventListener('click', (e) => {
@@ -679,9 +700,10 @@ async function triggerSpin() {
     return;
   }
 
-  // 2) 일반 회원의 경우 잔여 기회 체크
+  // 2) 일반 회원의 경우 잔여 기회 체크 (3회 소진 시 결제 충전 모달 자동 팝업!)
   if (!isUnlimited && remainingSpins <= 0) {
-    showToast('⏳ 오늘의 뽑기 기회(3회)를 모두 소진하셨습니다. 24시간 후 다시 충전됩니다!');
+    showToast('⚡ 오늘의 무료 기회(3회)가 소진되었습니다! 스핀을 충전하여 룰렛을 계속 돌려보세요.');
+    openRechargeModal();
     return;
   }
 
@@ -1536,7 +1558,378 @@ async function adminRechargeUserSpins() {
   }
 }
 
-// ── 20. 전역 함수 바인딩 ──
+// ── 20. 스핀 충전 및 모의 간편결제 시스템 (20,000원 결제 시 10회 충전) ──
+let selectedPayMethod = 'kakaopay';
+
+function openRechargeModal() {
+  if (!currentUser) {
+    showToast('⚠️ 충전을 위해 먼저 로그인이 필요합니다.');
+    openLoginModal();
+    return;
+  }
+  const modal = document.getElementById('rechargeModal');
+  if (modal) modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+
+  const overlay = document.getElementById('payLoadingOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function closeRechargeModal() {
+  const modal = document.getElementById('rechargeModal');
+  if (modal) modal.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function selectPayMethod(method, el) {
+  selectedPayMethod = method;
+  document.querySelectorAll('.pay-method-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+  if (el) {
+    el.classList.add('selected');
+  }
+}
+
+async function processFakePayment() {
+  if (!currentUser) {
+    showToast('⚠️ 로그인이 필요합니다.');
+    openLoginModal();
+    return;
+  }
+
+  const overlay = document.getElementById('payLoadingOverlay');
+  const titleEl = document.getElementById('payLoadingTitle');
+  const subEl = document.getElementById('payLoadingSub');
+  const btnSubmit = document.getElementById('btnSubmitPayment');
+
+  const methodNames = {
+    kakaopay: '카카오페이',
+    toss: '토스페이',
+    naverpay: '네이버페이',
+    card: '신용/체크카드'
+  };
+  const methodName = methodNames[selectedPayMethod] || '간편결제';
+
+  if (overlay) {
+    overlay.style.display = 'flex';
+    if (titleEl) titleEl.textContent = `${methodName} 승인 처리 중...`;
+    if (subEl) subEl.textContent = '안전 결제 게이트웨이와 256bit 암호화 통신 중입니다. 잠시만 기다려주세요.';
+  }
+  if (btnSubmit) btnSubmit.disabled = true;
+
+  // 현실적인 결제 승인 지연 시뮬레이션
+  await new Promise(r => setTimeout(r, 1500));
+
+  try {
+    const res = await fetch('/api/spin/recharge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: currentUser.username,
+        amount: 20000,
+        spins: 10,
+        payMethod: selectedPayMethod
+      })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      remainingSpins = data.remainingSpins;
+      updateSpinsDisplay();
+      closeRechargeModal();
+      showToast(`🎉 20,000원 결제 성공! 스핀 10회가 충전되었습니다! (총 ${remainingSpins}회)`);
+      playWinFanfare();
+    } else {
+      showToast(data.error || '결제 처리에 실패했습니다.');
+    }
+  } catch (err) {
+    console.error('결제 오류:', err);
+    showToast('결제 처리 중 통신 오류가 발생했습니다.');
+  } finally {
+    if (overlay) overlay.style.display = 'none';
+    if (btnSubmit) btnSubmit.disabled = false;
+  }
+}
+
+// ── 21. 실시간 당첨자 생생 후기 (리뷰) 시스템 ──
+let currentReviewRating = 5;
+
+function setReviewRating(rating) {
+  currentReviewRating = rating;
+  const stars = document.querySelectorAll('#ratingStarsInput .star-item');
+  stars.forEach((star, index) => {
+    if (index < rating) {
+      star.classList.add('active');
+    } else {
+      star.classList.remove('active');
+    }
+  });
+  const textEl = document.getElementById('ratingValText');
+  if (textEl) {
+    textEl.textContent = `${rating}.0점 ${rating === 5 ? '만점' : '만족'}`;
+  }
+}
+
+function openReviewModal() {
+  const modal = document.getElementById('reviewModal');
+  if (modal) modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+
+  const authorInput = document.getElementById('reviewAuthor');
+  if (authorInput && currentUser) {
+    const masked = currentUser.name 
+      ? (currentUser.name.length > 2 ? currentUser.name[0] + '*' + currentUser.name.slice(2) : currentUser.name[0] + '*')
+      : (currentUser.username.substring(0, 3) + '***');
+    authorInput.value = `${masked} (회원)`;
+  }
+}
+
+function closeReviewModal() {
+  const modal = document.getElementById('reviewModal');
+  if (modal) modal.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+async function loadLiveReviews() {
+  const grid = document.getElementById('reviewGrid');
+  if (!grid) return;
+
+  try {
+    const res = await fetch('/api/reviews');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.reviews)) {
+      renderReviewCards(data.reviews);
+    }
+  } catch (e) {
+    console.warn('리뷰 로드 실패, 기본 리뷰 유지:', e);
+  }
+}
+
+function renderReviewCards(reviews) {
+  const grid = document.getElementById('reviewGrid');
+  if (!grid) return;
+
+  grid.innerHTML = reviews.map(r => {
+    const stars = '★'.repeat(r.rating || 5) + '☆'.repeat(5 - (r.rating || 5));
+    return `
+      <div class="review-card" data-id="${r.id}">
+        <div class="review-card-top">
+          <div class="review-user-info">
+            <div class="review-avatar">${r.avatar || '👤'}</div>
+            <div>
+              <div class="review-author-name">${escapeHtml(r.author)}</div>
+              <div class="review-item-won">당첨 상품: <strong>${escapeHtml(r.item)}</strong></div>
+            </div>
+          </div>
+          <div class="review-rating-stars">${stars}</div>
+        </div>
+        <p class="review-comment-text">${escapeHtml(r.comment)}</p>
+        <div class="review-card-footer">
+          <span class="review-time-ago">${r.timeAgo || '방금 전'}</span>
+          <button type="button" class="btn-review-like" onclick="likeReview('${r.id}', this)">
+            👍 도움돼요 <span class="like-count">${r.likes || 12}</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function likeReview(reviewId, btn) {
+  if (!btn) return;
+  const countEl = btn.querySelector('.like-count');
+  if (!countEl) return;
+  let cnt = parseInt(countEl.textContent || '0', 10);
+  cnt += 1;
+  countEl.textContent = cnt;
+  btn.style.color = '#00B14F';
+  btn.style.borderColor = '#00B14F';
+  showToast('👍 후기를 추천하였습니다.');
+}
+
+async function submitUserReview() {
+  const authorEl = document.getElementById('reviewAuthor');
+  const selectEl = document.getElementById('reviewCouponSelect');
+  const contentEl = document.getElementById('reviewContent');
+
+  const author = authorEl ? authorEl.value.trim() : '';
+  const item = selectEl ? selectEl.value : '스타벅스 디저트 세트';
+  const comment = contentEl ? contentEl.value.trim() : '';
+
+  if (!author) {
+    showToast('작성자 닉네임을 입력해주세요.');
+    return;
+  }
+  if (!comment || comment.length < 5) {
+    showToast('후기 내용을 5글자 이상 정성스럽게 입력해주세요.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        author,
+        item,
+        rating: currentReviewRating,
+        comment
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('🎉 소중한 당첨 후기가 등록되었습니다!');
+      closeReviewModal();
+      if (contentEl) contentEl.value = '';
+      loadLiveReviews();
+    } else {
+      showToast(data.error || '후기 등록 실패');
+    }
+  } catch (e) {
+    showToast('후기 등록 중 통신 오류가 발생했습니다.');
+  }
+}
+
+// ── 22. 1:1 고객센터 실시간 상담톡 챗봇 ──
+function openChatModal() {
+  const modal = document.getElementById('chatModal');
+  if (modal) modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  const input = document.getElementById('chatInput');
+  if (input) setTimeout(() => input.focus(), 200);
+}
+
+function closeChatModal() {
+  const modal = document.getElementById('chatModal');
+  if (modal) modal.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+const FAQ_ANSWERS = {
+  storage: `🎁 <strong>당첨 쿠폰 확인 방법</strong><br>
+룰렛 아래의 <strong>[🎁 내가 획득한 쿠폰 보관함]</strong>에 회원님이 직접 당첨되신 쿠폰과 랜덤 고유 바코드가 자동으로 실시간 보관됩니다! 이미지를 다운로드하거나 바코드 번호를 복사하여 사용하실 수 있습니다.`,
+  use: `🏪 <strong>매장 현장 사용 방법</strong><br>
+보관함에 저장된 쿠폰의 <strong>[바코드]</strong> 또는 <strong>[이미지 다운로드]</strong>를 누른 후, 전국 신세계백화점, BHC, 스타벅스, 배민, 편의점 매장 카운터/키오스크/공식앱에서 바코드를 스캔 또는 쿠폰번호를 등록하시면 0원에 즉시 교환 및 결제됩니다!`,
+  recharge: `⚡ <strong>스핀 추가 충전 안내</strong><br>
+일일 무료 기회 3회를 모두 사용하셨다면, 룰렛 우측 하단의 <strong>[⚡ 스핀 10회 즉시 충전 (20,000원)]</strong> 버튼을 통해 간편결제(카카오페이/토스/네이버페이/카드)로 10회를 즉시 충전받으실 수 있습니다!`,
+  cooldown: `⏳ <strong>24시간 쿨타임 시스템</strong><br>
+쿠폰모아는 모든 회원님들에게 공정한 당첨 기회를 제공하기 위해 24시간마다 매일 자정에 무료 뽑기 3회가 자동으로 100% 충전됩니다.`
+};
+
+function askChatBot(type) {
+  const questionMap = {
+    storage: '🎁 당첨 쿠폰은 어디서 보나요?',
+    use: '🏪 매장에서 어떻게 사용하나요?',
+    recharge: '⚡ 스핀 추가 충전은 어떻게 하나요?',
+    cooldown: '⏳ 24시간 쿨타임이 뭔가요?'
+  };
+
+  const userQuestion = questionMap[type] || '문의합니다.';
+  appendChatMessage(userQuestion, 'user');
+
+  const answer = FAQ_ANSWERS[type] || '문의 감사드립니다. 고객센터 담당자가 확인 중입니다.';
+  
+  setTimeout(() => {
+    appendChatMessage(answer, 'bot');
+  }, 400);
+}
+
+function sendChatMessage() {
+  const input = document.getElementById('chatInput');
+  if (!input) return;
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  appendChatMessage(msg, 'user');
+  input.value = '';
+
+  setTimeout(() => {
+    let reply = `소중한 문의 감사드립니다! 입력해주신 <em>"${escapeHtml(msg)}"</em> 관련하여 추가 안내가 필요하신 경우 <strong>자주 묻는 질문 버튼</strong>을 이용하시거나 1:1 담당자 연결을 기다려주세요.`;
+    
+    if (msg.includes('쿠폰') || msg.includes('보관함') || msg.includes('어디')) {
+      reply = FAQ_ANSWERS.storage;
+    } else if (msg.includes('사용') || msg.includes('매장') || msg.includes('바코드')) {
+      reply = FAQ_ANSWERS.use;
+    } else if (msg.includes('충전') || msg.includes('돈') || msg.includes('결제') || msg.includes('2만원') || msg.includes('20000')) {
+      reply = FAQ_ANSWERS.recharge;
+    } else if (msg.includes('쿨타임') || msg.includes('기회') || msg.includes('시간') || msg.includes('언제')) {
+      reply = FAQ_ANSWERS.cooldown;
+    } else if (msg.includes('관리자') || msg.includes('비번') || msg.includes('아이디')) {
+      reply = `관리자 로그인은 상단 <strong>[로그인]</strong> 버튼에서 관리자 계정으로 접속하시면 관리자 전용 대시보드가 오픈됩니다.`;
+    }
+
+    appendChatMessage(reply, 'bot');
+  }, 500);
+}
+
+function appendChatMessage(htmlText, sender = 'bot') {
+  const chatBody = document.getElementById('chatBody');
+  if (!chatBody) return;
+
+  const msgDiv = document.createElement('div');
+  msgDiv.className = `chat-msg ${sender}`;
+  msgDiv.innerHTML = `<div class="msg-bubble">${htmlText}</div>`;
+  
+  chatBody.appendChild(msgDiv);
+  chatBody.scrollTop = chatBody.scrollHeight;
+}
+
+// ── 23. 실시간 당첨 라이브 토스트 (좌측 하단 순환 알림) ──
+const LIVE_WINNER_SAMPLES = [
+  { name: '경기 수원 박*훈님', item: 'BHC 뿌링클 치킨 세트 (방금 전)' },
+  { name: '서울 강남 이*서님', item: '신세계상품권 50,000원권 (1분 전)' },
+  { name: '부산 해운대 최*준님', item: '스타벅스 달콤한 디저트 세트 (2분 전)' },
+  { name: '인천 연수 정*우님', item: '배달의민족 10,000원권 (방금 전)' },
+  { name: '대구 수성 김*지님', item: '올리브영 기프트카드 20,000원 (3분 전)' },
+  { name: '대전 서구 강*호님', item: '도미노피자 포테이토 세트 (방금 전)' },
+  { name: '광주 광산 윤*아님', item: '맥도날드 빅맥 세트 교환권 (4분 전)' },
+  { name: '서울 마포 송*민님', item: '네이버페이 포인트 5,000원 (1분 전)' }
+];
+
+let liveWinnerIdx = 0;
+function initLiveWinnerToasts() {
+  const toast = document.getElementById('liveWinnerToast');
+  const titleEl = document.getElementById('liveWinnerTitle');
+  const itemEl = document.getElementById('liveWinnerItem');
+  if (!toast || !titleEl || !itemEl) return;
+
+  function showNextWinner() {
+    const sample = LIVE_WINNER_SAMPLES[liveWinnerIdx % LIVE_WINNER_SAMPLES.length];
+    liveWinnerIdx++;
+
+    titleEl.textContent = `${sample.name} 당첨! 🎉`;
+    itemEl.textContent = sample.item;
+
+    toast.style.display = 'flex';
+    toast.classList.add('show');
+
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 400);
+    }, 4000);
+  }
+
+  // 4초 후 첫 시작, 이후 8.5초마다 순환
+  setTimeout(() => {
+    showNextWinner();
+    setInterval(showNextWinner, 8500);
+  }, 4000);
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// ── 24. 전역 함수 바인딩 ──
 window.triggerSpin = triggerSpin;
 window.toggleSound = toggleSound;
 window.closeWinModal = closeWinModal;
@@ -1565,7 +1958,27 @@ window.closeAdminModal = closeAdminModal;
 window.loadAdminUserList = loadAdminUserList;
 window.adminRechargeUserSpins = adminRechargeUserSpins;
 
-// ── 19. 방문자 통계 및 디스코드 웹훅 연동 ──
+// 충전 및 결제 함수 전역 노출
+window.openRechargeModal = openRechargeModal;
+window.closeRechargeModal = closeRechargeModal;
+window.selectPayMethod = selectPayMethod;
+window.processFakePayment = processFakePayment;
+
+// 리뷰 함수 전역 노출
+window.openReviewModal = openReviewModal;
+window.closeReviewModal = closeReviewModal;
+window.setReviewRating = setReviewRating;
+window.submitUserReview = submitUserReview;
+window.likeReview = likeReview;
+window.loadLiveReviews = loadLiveReviews;
+
+// 고객센터 상담톡 함수 전역 노출
+window.openChatModal = openChatModal;
+window.closeChatModal = closeChatModal;
+window.askChatBot = askChatBot;
+window.sendChatMessage = sendChatMessage;
+
+// ── 25. 방문자 통계 및 디스코드 웹훅 연동 ──
 (function trackVisitor() {
   try {
     const payload = {
@@ -1583,6 +1996,7 @@ window.adminRechargeUserSpins = adminRechargeUserSpins;
       body: JSON.stringify(payload)
     }).catch(() => {});
   } catch (e) {
-    // 무시 (오류 발생해도 사용자 화면에 전혀 영향 없음)
+    // 무시
   }
 })();
+
