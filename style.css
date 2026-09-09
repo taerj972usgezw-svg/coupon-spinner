@@ -2099,3 +2099,591 @@ input, select {
   font-weight: 700;
   cursor: pointer;
 }
+
+/* ── 21. 스핀 충전 (20,000원 결제 모달 및 버튼) ── */
+.chance-recharge-row {
+  margin-top: 14px;
+}
+
+.btn-recharge-spins {
+  width: 100%;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #FF6B00 0%, #FFB300 100%);
+  color: #11141A;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 800;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 16px rgba(255, 107, 0, 0.35);
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-recharge-spins:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 107, 0, 0.5);
+}
+
+.btn-recharge-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recharge-bolt {
+  font-size: 1.3rem;
+  animation: pulse 1s infinite alternate;
+}
+
+.badge-discount-pill {
+  background: #B71C1C;
+  color: #FFFFFF;
+  font-size: 0.75rem;
+  font-weight: 900;
+  padding: 3px 8px;
+  border-radius: 100px;
+}
+
+/* 충전 모달 */
+.recharge-modal-dialog {
+  width: 100%;
+  max-width: 440px;
+  background: #FFFFFF;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  animation: modalPopUp 0.3s ease;
+  position: relative;
+  z-index: 10005;
+}
+
+.recharge-modal-header {
+  padding: 20px 24px;
+  background: #151821;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recharge-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recharge-title-row h3 {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.recharge-modal-body {
+  padding: 24px;
+}
+
+.recharge-package-card {
+  background: #FFF8E7;
+  border: 1.5px solid #FFD54F;
+  border-radius: var(--radius-md);
+  padding: 18px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.package-tag-pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #D84315;
+  background: #FFCCBC;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.package-name {
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #191F28;
+  margin-bottom: 4px;
+}
+
+.package-desc {
+  font-size: 0.8rem;
+  color: #6B7684;
+  margin-bottom: 12px;
+}
+
+.package-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.price-origin {
+  font-size: 0.9rem;
+  color: #8B95A1;
+  text-decoration: line-through;
+}
+
+.price-discount {
+  font-size: 0.88rem;
+  font-weight: 900;
+  color: #E53935;
+}
+
+.price-current {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #FF2B44;
+  margin-left: auto;
+}
+
+.price-unit {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #191F28;
+}
+
+/* 결제 수단 그리드 */
+.pay-method-section {
+  margin-bottom: 20px;
+}
+
+.pay-method-label {
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #4E5968;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.pay-methods-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pay-method-item {
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #FFFFFF;
+}
+
+.pay-method-item:hover {
+  border-color: #B0B8C1;
+  background: #F9FAFC;
+}
+
+.pay-method-item.selected {
+  border-color: #FF2B44;
+  background: #FFF0F2;
+  box-shadow: 0 0 0 2px rgba(255, 43, 68, 0.2);
+}
+
+.pay-method-icon {
+  font-size: 1.2rem;
+}
+
+.pay-method-name {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #191F28;
+}
+
+.pay-security-notice {
+  font-size: 0.76rem;
+  color: #8B95A1;
+  text-align: center;
+  margin-bottom: 16px;
+  background: #F2F4F7;
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.btn-pay-action {
+  width: 100%;
+  padding: 14px;
+  background: var(--primary-gradient);
+  color: #FFFFFF;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(255, 43, 68, 0.4);
+  transition: all 0.2s;
+}
+
+.btn-pay-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 43, 68, 0.55);
+}
+
+/* 결제 로딩 오버레이 */
+.pay-loading-overlay {
+  padding: 50px 24px;
+  text-align: center;
+}
+
+.pay-loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #E5E8EB;
+  border-top-color: #FF2B44;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto 20px;
+}
+
+/* ── 22. 실시간 리뷰 섹션 업그레이드 ── */
+.review-header-wrap {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.review-action-box {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.review-score-pill {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 8px 14px;
+  border-radius: 100px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.score-stars {
+  color: #FFB300;
+  font-size: 1rem;
+}
+
+.score-number {
+  font-weight: 900;
+  color: #FFFFFF;
+}
+
+.score-total {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.78rem;
+}
+
+.btn-write-review {
+  padding: 9px 18px;
+  background: linear-gradient(135deg, #FFB300 0%, #FF8F00 100%);
+  color: #11141A;
+  border-radius: 100px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(255, 179, 0, 0.35);
+  transition: all 0.2s;
+}
+
+.btn-write-review:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(255, 179, 0, 0.5);
+}
+
+.review-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.btn-review-like {
+  padding: 4px 10px;
+  background: #F2F4F7;
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-sub);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-review-like:hover, .btn-review-like.liked {
+  background: #FFF0F2;
+  border-color: #FFCCD2;
+  color: #FF2B44;
+}
+
+/* 별점 선택 */
+.rating-stars-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.star-item {
+  color: #D1D6DB;
+  transition: all 0.15s;
+}
+
+.star-item.active {
+  color: #FFB300;
+}
+
+.rating-val-text {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-left: 8px;
+}
+
+.form-select, .form-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  background: #FFFFFF;
+}
+
+/* ── 23. 고객센터 1:1 상담톡 챗봇 & 플로팅 ── */
+.floating-chat-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #FF2B44 0%, #FF6536 100%);
+  color: #FFFFFF;
+  border-radius: 100px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 8px 24px rgba(255, 43, 68, 0.45);
+  cursor: pointer;
+  z-index: 9998;
+  font-weight: 800;
+  font-size: 0.92rem;
+  transition: all 0.25s;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+}
+
+.floating-chat-btn:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 12px 30px rgba(255, 43, 68, 0.6);
+}
+
+.chat-online-badge {
+  background: #00E676;
+  color: #11141A;
+  font-size: 0.62rem;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 100px;
+}
+
+.chat-modal-dialog {
+  width: 100%;
+  max-width: 400px;
+  height: 520px;
+  background: #FFFFFF;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  animation: modalPopUp 0.3s ease;
+  z-index: 10005;
+}
+
+.chat-header {
+  padding: 16px 20px;
+  background: #1A1F2C;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-agent-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agent-avatar {
+  font-size: 1.8rem;
+}
+
+.agent-name {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.agent-status {
+  font-size: 0.72rem;
+  color: #A0AEC0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  background: #00E676;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.chat-body {
+  flex: 1;
+  padding: 16px;
+  background: #F4F6F9;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-msg {
+  display: flex;
+}
+
+.chat-msg.bot {
+  justify-content: flex-start;
+}
+
+.chat-msg.user {
+  justify-content: flex-end;
+}
+
+.msg-bubble {
+  max-width: 82%;
+  padding: 11px 14px;
+  border-radius: 16px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.chat-msg.bot .msg-bubble {
+  background: #FFFFFF;
+  color: var(--text-main);
+  border-bottom-left-radius: 4px;
+  box-shadow: var(--shadow-sm);
+}
+
+.chat-msg.user .msg-bubble {
+  background: var(--primary);
+  color: #FFFFFF;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 6px;
+}
+
+.btn-quick-faq {
+  text-align: left;
+  padding: 9px 12px;
+  background: #FFFFFF;
+  border: 1px solid #E5E8EB;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #333D4B;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-quick-faq:hover {
+  background: #FFF0F2;
+  border-color: #FFCCD2;
+  color: #FF2B44;
+}
+
+.chat-footer {
+  padding: 12px 16px;
+  background: #FFFFFF;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+}
+
+.chat-footer input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+}
+
+.btn-chat-send {
+  padding: 9px 16px;
+  background: var(--primary);
+  color: #FFFFFF;
+  border-radius: var(--radius-sm);
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* ── 24. 좌측 하단 실시간 당첨 라이브 알림 토스트 ── */
+.live-winner-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  background: rgba(17, 20, 26, 0.95);
+  border: 1px solid rgba(255, 213, 79, 0.4);
+  color: #FFFFFF;
+  border-radius: 100px;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  z-index: 9997;
+  animation: slideInLeft 0.4s ease;
+}
+
+.live-winner-icon {
+  font-size: 1.4rem;
+}
+
+.live-winner-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #FFD54F;
+}
+
+.live-winner-item {
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
