@@ -61,8 +61,10 @@
       </a>
       <nav class="nav">
         <a href="#spinner-section" class="nav-item active">🎡 럭키 스핀</a>
-        <a href="#my-coupons-section" class="nav-item">🎁 내 보관함 (<span id="navVaultCount">0</span>)</a>
-        <a href="#lineup-section" class="nav-item">💎 쿠폰 라인업</a>
+        <a href="#attendance-section" class="nav-item">📅 출석체크</a>
+        <a href="#ranking-section" class="nav-item">🏆 명예의 전당</a>
+        <a href="#my-coupons-section" class="nav-item">🎁 보관함 (<span id="navVaultCount">0</span>)</a>
+        <a href="javascript:void(0)" class="nav-item nav-highlight" onclick="openReferralModal()">👥 친구초대</a>
       </nav>
       <div class="header-right">
         <!-- 로그인 안 된 상태 버튼들 -->
@@ -83,6 +85,11 @@
           </button>
           <button type="button" id="btnLogout" class="btn-auth-logout" onclick="logoutUser()">로그아웃</button>
         </div>
+
+        <button type="button" class="btn-invite-pill" onclick="openReferralModal()">
+          <span>👥 친구초대</span>
+          <span class="invite-bonus-tag">+1회</span>
+        </button>
 
         <button type="button" class="btn-my-wallet" onclick="scrollToMyCoupons()">
           <span>🎁 내 쿠폰함</span>
@@ -197,6 +204,74 @@
   </section>
 
   <!-- ================================================================= -->
+  <!-- 📅 매일매일 출석체크 & 연속 출석 보너스 섹션 -->
+  <!-- ================================================================= -->
+  <section class="attendance-section" id="attendance-section">
+    <div class="container">
+      <div class="attendance-card-box">
+        <div class="attendance-header">
+          <div class="attendance-title-group">
+            <span class="attendance-badge">DAILY EVENT</span>
+            <h3 class="attendance-title">📅 매일매일 출석체크 & 보너스 스핀</h3>
+            <p class="attendance-sub">매일 1회 출석도장 찍고, 3일/7일 연속 출석 시 무료 스핀을 보너스로 드립니다!</p>
+          </div>
+          <div class="attendance-streak-badge">
+            <span class="streak-icon">🔥</span>
+            <span class="streak-txt">현재 연속 <strong id="attendanceStreakCount">0</strong>일 출석 중</span>
+          </div>
+        </div>
+
+        <!-- 7일 스탬프 그리드 -->
+        <div class="attendance-grid" id="attendanceGrid">
+          <div class="stamp-item" data-day="1">
+            <span class="stamp-day">1일차</span>
+            <div class="stamp-circle"><span class="stamp-status">출석</span></div>
+            <span class="stamp-reward">출석체크</span>
+          </div>
+          <div class="stamp-item" data-day="2">
+            <span class="stamp-day">2일차</span>
+            <div class="stamp-circle"><span class="stamp-status">출석</span></div>
+            <span class="stamp-reward">출석체크</span>
+          </div>
+          <div class="stamp-item bonus" data-day="3">
+            <span class="stamp-day">3일차</span>
+            <div class="stamp-circle"><span class="stamp-status">🎁 +1스핀</span></div>
+            <span class="stamp-reward bonus-tag">보너스 스핀</span>
+          </div>
+          <div class="stamp-item" data-day="4">
+            <span class="stamp-day">4일차</span>
+            <div class="stamp-circle"><span class="stamp-status">출석</span></div>
+            <span class="stamp-reward">출석체크</span>
+          </div>
+          <div class="stamp-item" data-day="5">
+            <span class="stamp-day">5일차</span>
+            <div class="stamp-circle"><span class="stamp-status">출석</span></div>
+            <span class="stamp-reward">출석체크</span>
+          </div>
+          <div class="stamp-item" data-day="6">
+            <span class="stamp-day">6일차</span>
+            <div class="stamp-circle"><span class="stamp-status">출석</span></div>
+            <span class="stamp-reward">출석체크</span>
+          </div>
+          <div class="stamp-item jackpot" data-day="7">
+            <span class="stamp-day">7일 완주</span>
+            <div class="stamp-circle"><span class="stamp-status">👑 +2스핀</span></div>
+            <span class="stamp-reward jackpot-tag">대박 보너스</span>
+          </div>
+        </div>
+
+        <div class="attendance-action-wrap">
+          <button type="button" class="btn-check-attendance" id="btnCheckAttendance" onclick="doAttendanceCheck()">
+            <span class="btn-check-icon">쾅!</span>
+            <span id="attendanceBtnText">오늘 출석체크 하고 도장 찍기</span>
+          </button>
+          <span class="attendance-note">※ 매일 00:00에 출석 일차가 갱신됩니다.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
   <!-- 🎁 내가 뽑은 쿠폰 보관함 (로컬 저장소 전용 - 뽑은 것만 표시!) -->
   <!-- ================================================================= -->
   <section class="my-coupons-section" id="my-coupons-section">
@@ -237,6 +312,48 @@
 
       <div class="lineup-grid" id="lineupGrid">
         <!-- JS로 동적 생성 -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <!-- 🏆 실시간 명예의 전당 & 럭키 랭킹 (실제 회원 + 봇 실시간 혼합) -->
+  <!-- ================================================================= -->
+  <section class="ranking-section" id="ranking-section">
+    <div class="container">
+      <div class="section-title-wrap">
+        <div>
+          <div class="section-tag-pill gold">HALL OF FAME</div>
+          <h2 class="section-heading text-white">🏆 실시간 명예의 전당 & 럭키 랭킹</h2>
+          <p class="section-sub text-white-muted">오늘 최고 혜택을 당첨받은 행운의 주인공들을 실시간으로 공개합니다.</p>
+        </div>
+        <div class="ranking-live-pulse">
+          <span class="pulse-dot"></span>
+          <span class="pulse-txt">실시간 집계 중</span>
+        </div>
+      </div>
+
+      <!-- 상위 1, 2, 3위 포디움 트로피 카드 -->
+      <div class="podium-cards-grid" id="podiumGrid">
+        <!-- JS로 동적 렌더링 -->
+      </div>
+
+      <!-- 4위 ~ 10위 랭킹 리스트 테이블 -->
+      <div class="ranking-table-card">
+        <table class="ranking-table">
+          <thead>
+            <tr>
+              <th>순위</th>
+              <th>당첨 회원</th>
+              <th>당첨 기프티콘</th>
+              <th>혜택 가치</th>
+              <th>당첨 시점</th>
+            </tr>
+          </thead>
+          <tbody id="rankingTableBody">
+            <tr><td colspan="5" style="text-align:center; padding:24px; color:#888;">실시간 랭킹 집계 중...</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </section>
@@ -487,19 +604,48 @@
           <button type="button" id="btnCloseRegisterModal" class="modal-close-icon" onclick="closeRegisterModal()">✕</button>
         </div>
         <div class="auth-modal-body">
-          <p class="auth-desc">3초 만에 간편 가입하고 24시간마다 3개의 무료 쿠폰 스핀 혜택을 받아보세요!</p>
+          <p class="auth-desc">휴대폰 본인 인증(1인 1계정 원칙) 후 24시간마다 무료 3회 스핀 혜택을 받아보세요!</p>
           <div class="form-field">
             <label>아이디 (3자 이상)</label>
             <input type="text" id="regUsername" placeholder="사용할 아이디" autocomplete="username" />
           </div>
           <div class="form-field">
-            <label>닉네임 (선택)</label>
+            <label>닉네임 / 이름 (선택)</label>
             <input type="text" id="regName" placeholder="표시될 닉네임" />
           </div>
           <div class="form-field">
             <label>비밀번호 (4자 이상)</label>
             <input type="password" id="regPassword" placeholder="비밀번호 입력" autocomplete="new-password" />
           </div>
+
+          <!-- 휴대폰 본인인증 (1인 1계정 원칙) -->
+          <div class="form-field">
+            <label>휴대폰 번호 (1인 1계정 인증 필수)</label>
+            <div class="phone-input-group">
+              <input type="tel" id="regPhone" placeholder="01012345678 (-없이 숫자만)" maxlength="11" />
+              <button type="button" id="btnSendSms" class="btn-sms-action" onclick="sendRegisterSms()">인증번호 전송</button>
+            </div>
+          </div>
+          <div class="form-field" id="smsCodeField" style="display:none;">
+            <div class="sms-label-row">
+              <label>인증번호 6자리</label>
+              <span id="smsTimerText" class="sms-timer-countdown">03:00</span>
+            </div>
+            <div class="phone-input-group">
+              <input type="text" id="regSmsCode" placeholder="인증번호 6자리 입력" maxlength="6" />
+              <button type="button" id="btnVerifySms" class="btn-sms-action confirm" onclick="verifyRegisterSms()">인증 확인</button>
+            </div>
+            <div id="smsVerifiedBadge" class="sms-verified-badge" style="display:none;">
+              ✅ 휴대폰 본인인증 완료 (1인 1계정 확인됨)
+            </div>
+          </div>
+
+          <!-- 추천인 코드 (선택) -->
+          <div class="form-field">
+            <label>추천인 코드 (선택 - 입력 시 +1회 보너스 스핀!)</label>
+            <input type="text" id="regReferralCode" placeholder="친구의 초대 코드 입력 (예: MOA-XXXX)" />
+          </div>
+
           <button type="button" id="btnSubmitRegister" class="btn-primary-auth" onclick="submitRegister()">회원가입 완료</button>
           <div class="auth-switch-row">
             <span>이미 계정이 있으신가요?</span>
@@ -655,6 +801,63 @@
           <p id="payLoadingSub">안전 결제 게이트웨이와 통신 중입니다. 잠시만 기다려주세요.</p>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- 👥 친구 초대 (추천인 시스템) 모달 -->
+  <!-- ================================================================= -->
+  <div class="modal-backdrop" id="referralModal">
+    <div class="referral-modal-dialog">
+      <div class="referral-modal-content">
+        <div class="referral-modal-header">
+          <div class="referral-title-row">
+            <span class="referral-icon">🎁</span>
+            <h3>친구 초대하고 무제한 스핀 받기</h3>
+          </div>
+          <button type="button" class="modal-close-icon" onclick="closeReferralModal()">✕</button>
+        </div>
+
+        <div class="referral-modal-body">
+          <div class="referral-banner-card">
+            <div class="banner-badge">100% 보너스 지급</div>
+            <h4>친구 초대할 때마다 둘 다 스핀 +1회!</h4>
+            <p>친구가 내 추천인 코드로 가입하면, <strong>친구에게도 스핀 +1회, 나에게도 스핀 +1회</strong>가 즉시 적립됩니다. (초대 인원 무제한!)</p>
+          </div>
+
+          <!-- 내 추천 코드 박스 -->
+          <div class="my-code-box">
+            <label class="my-code-label">나의 고유 추천인 코드</label>
+            <div class="code-copy-row">
+              <span class="my-referral-code" id="myReferralCodeText">MOA-LOGIN</span>
+              <button type="button" class="btn-copy-code" onclick="copyMyReferralCode()">코드 복사</button>
+            </div>
+          </div>
+
+          <!-- 공유 버튼들 -->
+          <div class="referral-actions-grid">
+            <button type="button" class="btn-invite-share kakao" onclick="shareReferralKakao()">
+              <span>🟡 카카오톡으로 초대장 보내기</span>
+            </button>
+            <button type="button" class="btn-invite-share link" onclick="copyReferralLink()">
+              <span>🔗 초대 전용 링크 복사</span>
+            </button>
+          </div>
+
+          <!-- 내 초대 현황 통계 -->
+          <div class="referral-stats-box">
+            <div class="stat-item">
+              <span class="stat-val" id="refTotalInvited">0명</span>
+              <span class="stat-lbl">초대한 친구 수</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <span class="stat-val" id="refEarnedSpins">0회</span>
+              <span class="stat-lbl">획득한 보너스 스핀</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
