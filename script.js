@@ -690,8 +690,8 @@ function bindAllClickEvents() {
   bindEnter('regUsername', submitRegister);
   bindEnter('regName', submitRegister);
   bindEnter('regPassword', submitRegister);
-  bindEnter('regPhone', sendRegisterSms);
-  bindEnter('regSmsCode', verifyRegisterSms);
+  bindEnter('regPhone', submitRegister);
+  bindEnter('regEmail', submitRegister);
   bindEnter('regReferralCode', submitRegister);
 }
 
@@ -1349,53 +1349,14 @@ function closeLoginModal() {
   document.body.style.overflow = '';
 }
 
-let isSmsVerified = false;
-let verifiedPhone = '';
-let smsCountdownTimer = null;
-let smsCountdownSeconds = 180;
-
-function resetSmsState() {
-  isSmsVerified = false;
-  verifiedPhone = '';
-  if (smsCountdownTimer) {
-    clearInterval(smsCountdownTimer);
-    smsCountdownTimer = null;
-  }
-  const field = document.getElementById('smsCodeField');
-  if (field) field.style.display = 'none';
-  const badge = document.getElementById('smsVerifiedBadge');
-  if (badge) badge.style.display = 'none';
-  const phoneInput = document.getElementById('regPhone');
-  if (phoneInput) {
-    phoneInput.disabled = false;
-    phoneInput.value = '';
-  }
-  const codeInput = document.getElementById('regSmsCode');
-  if (codeInput) {
-    codeInput.disabled = false;
-    codeInput.value = '';
-  }
-  const btnSend = document.getElementById('btnSendSms');
-  if (btnSend) {
-    btnSend.disabled = false;
-    btnSend.textContent = '인증번호 전송';
-  }
-  const btnVerify = document.getElementById('btnVerifySms');
-  if (btnVerify) {
-    btnVerify.disabled = false;
-    btnVerify.textContent = '인증 확인';
-  }
-}
-
 function openRegisterModal() {
-  resetSmsState();
   const m = document.getElementById('registerModal');
   if (m) {
     m.classList.add('active');
     // URL 추천인 코드 파라미터가 있다면 자동 채우기
     const pendingRef = sessionStorage.getItem('pending_ref_code');
     const refInput = document.getElementById('regReferralCode');
-    if (pendingRef && refInput) {
+    if (pendingRef && refInput && !refInput.value) {
       refInput.value = pendingRef;
     }
     setTimeout(() => {
@@ -1420,157 +1381,6 @@ function switchToRegister() {
 function switchToLogin() {
   closeRegisterModal();
   setTimeout(openLoginModal, 150);
-}
-
-// ── SMS 휴대폰 모의 본인인증 (1인 1계정 검증) ──
-async function sendRegisterSms() {
-  const phoneInput = document.getElementById('regPhone');
-  const phone = phoneInput ? phoneInput.value.replace(/[^0-9]/g, '') : '';
-
-  if (!phone || phone.length < 10 || phone.length > 11 || !phone.startsWith('01')) {
-    showToast('⚠️ 올바른 휴대폰 번호(01012345678)를 입력해주세요.');
-    return;
-  }
-
-  const btnSend = document.getElementById('btnSendSms');
-  if (btnSend) {
-    btnSend.disabled = true;
-    btnSend.textContent = '발송 중...';
-  }
-
-  try {
-    const res = await fetch('/api/auth/send-sms', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone })
-    });
-    const data = await res.json();
-
-    if (!res.ok || !data.success) {
-      showToast(data.error || '인증번호 발송에 실패했습니다.');
-      if (btnSend) {
-        btnSend.disabled = false;
-        btnSend.textContent = '인증번호 전송';
-      }
-      return;
-    }
-
-    showToast(`📲 [인증번호 발송] ${data.message}`);
-    if (data.mockCode) {
-      setTimeout(() => {
-        showToast(`💡 발송된 인증번호: [${data.mockCode}]`);
-      }, 1000);
-      const codeInput = document.getElementById('regSmsCode');
-      if (codeInput) codeInput.value = data.mockCode;
-    }
-
-    const field = document.getElementById('smsCodeField');
-    if (field) field.style.display = 'block';
-
-    if (btnSend) {
-      btnSend.disabled = false;
-      btnSend.textContent = '재발송';
-    }
-
-    // 3분(180초) 타이머 시작
-    if (smsCountdownTimer) clearInterval(smsCountdownTimer);
-    smsCountdownSeconds = 180;
-    updateSmsTimerUI();
-    smsCountdownTimer = setInterval(() => {
-      smsCountdownSeconds--;
-      if (smsCountdownSeconds <= 0) {
-        clearInterval(smsCountdownTimer);
-        smsCountdownTimer = null;
-        const timerEl = document.getElementById('smsTimerText');
-        if (timerEl) timerEl.textContent = '시간만료';
-      } else {
-        updateSmsTimerUI();
-      }
-    }, 1000);
-
-  } catch (err) {
-    showToast('인증번호 발송 중 서버 통신 오류가 발생했습니다.');
-    if (btnSend) {
-      btnSend.disabled = false;
-      btnSend.textContent = '인증번호 전송';
-    }
-  }
-}
-
-function updateSmsTimerUI() {
-  const timerEl = document.getElementById('smsTimerText');
-  if (!timerEl) return;
-  const m = String(Math.floor(smsCountdownSeconds / 60)).padStart(2, '0');
-  const s = String(smsCountdownSeconds % 60).padStart(2, '0');
-  timerEl.textContent = `${m}:${s}`;
-}
-
-async function verifyRegisterSms() {
-  const phoneInput = document.getElementById('regPhone');
-  const codeInput = document.getElementById('regSmsCode');
-  const phone = phoneInput ? phoneInput.value.replace(/[^0-9]/g, '') : '';
-  const code = codeInput ? codeInput.value.trim() : '';
-
-  if (!phone) {
-    showToast('휴대폰 번호를 입력해주세요.');
-    return;
-  }
-  if (!code || code.length !== 6) {
-    showToast('6자리 인증번호를 정확히 입력해주세요.');
-    return;
-  }
-
-  const btnVerify = document.getElementById('btnVerifySms');
-  if (btnVerify) {
-    btnVerify.disabled = true;
-    btnVerify.textContent = '확인 중...';
-  }
-
-  try {
-    const res = await fetch('/api/auth/verify-sms', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, code })
-    });
-    const data = await res.json();
-
-    if (!res.ok || !data.success) {
-      showToast(data.error || '인증번호가 일치하지 않습니다.');
-      if (btnVerify) {
-        btnVerify.disabled = false;
-        btnVerify.textContent = '인증 확인';
-      }
-      return;
-    }
-
-    // 인증 성공
-    isSmsVerified = true;
-    verifiedPhone = phone;
-    if (smsCountdownTimer) {
-      clearInterval(smsCountdownTimer);
-      smsCountdownTimer = null;
-    }
-
-    if (phoneInput) phoneInput.disabled = true;
-    if (codeInput) codeInput.disabled = true;
-    const btnSend = document.getElementById('btnSendSms');
-    if (btnSend) btnSend.disabled = true;
-    if (btnVerify) {
-      btnVerify.disabled = true;
-      btnVerify.textContent = '인증완료';
-    }
-
-    const badge = document.getElementById('smsVerifiedBadge');
-    if (badge) badge.style.display = 'block';
-
-    showToast('✅ 휴대폰 본인인증 완료! (1인 1계정 확인됨)');
-  } catch (err) {
-    showToast('인증 확인 중 통신 오류가 발생했습니다.');
-    if (btnVerify) {
-      btnVerify.disabled = false;
-      btnVerify.textContent = '인증 확인';
-    }
-  }
 }
 
 // 로그인 제출
@@ -1616,17 +1426,34 @@ async function submitLogin() {
   }
 }
 
-// 회원가입 제출
+// 회원가입 제출 (SMS 인증 대기 없이 간편 즉시 가입 + 풍부한 합법 프로필 수집)
 async function submitRegister() {
   const uInput = document.getElementById('regUsername');
-  const nInput = document.getElementById('regName');
   const pInput = document.getElementById('regPassword');
+  const nInput = document.getElementById('regName');
+  const phoneInput = document.getElementById('regPhone');
+  const telecomSelect = document.getElementById('regTelecom');
+  const emailInput = document.getElementById('regEmail');
+  const ageSelect = document.getElementById('regAgeGroup');
+  const genderSelect = document.getElementById('regGender');
+  const regionSelect = document.getElementById('regRegion');
+  const interestSelect = document.getElementById('regInterest');
   const refInput = document.getElementById('regReferralCode');
+  const termsRequiredCheck = document.getElementById('regTermsRequired');
+  const termsMarketingCheck = document.getElementById('regTermsMarketing');
 
   const username = uInput ? uInput.value.trim() : '';
-  const name = nInput ? nInput.value.trim() : '';
   const password = pInput ? pInput.value.trim() : '';
+  const name = nInput ? nInput.value.trim() : '';
+  const rawPhone = phoneInput ? phoneInput.value.replace(/[^0-9]/g, '') : '';
+  const telecom = telecomSelect ? telecomSelect.value : 'SKT';
+  const email = emailInput ? emailInput.value.trim() : '';
+  const ageGroup = ageSelect ? ageSelect.value : '20대';
+  const gender = genderSelect ? genderSelect.value : '미선택';
+  const region = regionSelect ? regionSelect.value : '서울';
+  const interest = interestSelect ? interestSelect.value : '백화점 상품권';
   const referralCode = refInput ? refInput.value.trim() : '';
+  const marketingConsent = termsMarketingCheck ? termsMarketingCheck.checked : false;
 
   if (!username || !password) {
     showToast('아이디와 비밀번호를 모두 입력해주세요.');
@@ -1641,10 +1468,21 @@ async function submitRegister() {
     return;
   }
 
-  // 1인 1계정 휴대폰 본인인증 체크
-  if (!isSmsVerified || !verifiedPhone) {
-    showToast('⚠️ 휴대폰 번호 인증을 완료해주세요! (1인 1계정 원칙)');
+  if (!rawPhone || rawPhone.length < 10 || rawPhone.length > 11 || !rawPhone.startsWith('01')) {
+    showToast('⚠️ 기프티콘 수신을 위해 올바른 휴대폰 번호(010XXXXXXXX)를 입력해주세요.');
+    if (phoneInput) phoneInput.focus();
     return;
+  }
+
+  if (termsRequiredCheck && !termsRequiredCheck.checked) {
+    showToast('⚠️ [필수] 개인정보 수집 및 이용 동의에 체크해주세요.');
+    return;
+  }
+
+  const btnSubmit = document.getElementById('btnSubmitRegister');
+  if (btnSubmit) {
+    btnSubmit.disabled = true;
+    btnSubmit.textContent = '회원가입 처리 중...';
   }
 
   try {
@@ -1653,23 +1491,34 @@ async function submitRegister() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username,
-        name,
         password,
-        phone: verifiedPhone,
-        referralCode
+        name,
+        phone: rawPhone,
+        telecom,
+        email,
+        ageGroup,
+        gender,
+        region,
+        interest,
+        referralCode,
+        marketingConsent
       })
     });
     const data = await res.json();
 
     if (!res.ok || !data.success) {
       showToast(data.error || '회원가입에 실패했습니다.');
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = '3초 만에 회원가입 완료 & 스핀 받기';
+      }
       return;
     }
 
     if (data.bonusSpins && data.bonusSpins > 0) {
-      showToast(`🎉 회원가입 성공! 추천인 혜택으로 +${data.bonusSpins}회 보너스 스핀이 지급되었습니다!`);
+      showToast(`🎉 가입 완료! 추천인 보너스로 스핀 +${data.bonusSpins}회가 즉시 지급되었습니다!`);
     } else {
-      showToast('✨ 회원가입 성공! 가입하신 아이디로 로그인해주세요.');
+      showToast('🎉 회원가입 성공! 무료 3회 스핀이 지급되었습니다. 로그인해주세요!');
     }
 
     closeRegisterModal();
@@ -1680,6 +1529,11 @@ async function submitRegister() {
     }, 250);
   } catch (e) {
     showToast('서버 통신 오류가 발생했습니다.');
+  } finally {
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.textContent = '3초 만에 회원가입 완료 & 스핀 받기';
+    }
   }
 }
 
@@ -1694,6 +1548,30 @@ function logoutUser() {
 }
 
 // ── 19. 최고 관리자 전용 대시보드 함수들 (taeiyoon) ──
+function switchAdminTab(tabName) {
+  const tabs = ['users', 'analytics', 'recharge'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`tabBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
+    const panel = document.getElementById(`adminTabPanel${t.charAt(0).toUpperCase() + t.slice(1)}`);
+    if (btn) btn.classList.toggle('active', t === tabName);
+    if (panel) {
+      if (t === tabName) {
+        panel.style.display = 'block';
+        panel.classList.add('active');
+      } else {
+        panel.style.display = 'none';
+        panel.classList.remove('active');
+      }
+    }
+  });
+
+  if (tabName === 'analytics') {
+    loadAdminAnalytics();
+  } else if (tabName === 'users') {
+    loadAdminUserList();
+  }
+}
+
 function openAdminModal() {
   if (!currentUser || (currentUser.role !== 'admin' && currentUser.username !== 'taeiyoon')) {
     showToast('관리자 권한이 없습니다.');
@@ -1702,7 +1580,9 @@ function openAdminModal() {
   const m = document.getElementById('adminModal');
   if (m) m.classList.add('active');
   document.body.style.overflow = 'hidden';
+  switchAdminTab('users');
   loadAdminUserList();
+  loadAdminAnalytics();
 }
 
 function closeAdminModal() {
@@ -1715,37 +1595,145 @@ async function loadAdminUserList() {
   if (!currentUser) return;
   const tbody = document.getElementById('adminUserTableBody');
   const countEl = document.getElementById('adminTotalUsers');
+  const tabCountEl = document.getElementById('adminTabUserCount');
   if (!tbody) return;
 
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">회원 목록 조회 중...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:16px;">회원 데이터 조회 중...</td></tr>';
 
   try {
     const res = await fetch(`/api/admin/users?admin=${encodeURIComponent(currentUser.username)}`);
     const data = await res.json();
 
     if (!data.success) {
-      tbody.innerHTML = `<tr><td colspan="5" style="color:red; text-align:center;">${data.error}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" style="color:red; text-align:center; padding:16px;">${data.error}</td></tr>`;
       return;
     }
 
     if (countEl) countEl.textContent = `${data.totalUsers}명`;
+    if (tabCountEl) tabCountEl.textContent = `${data.totalUsers}명`;
 
     if (data.users.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">등록된 회원이 없습니다.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:16px;">등록된 회원이 없습니다.</td></tr>';
       return;
     }
 
     tbody.innerHTML = data.users.map(u => `
       <tr>
-        <td><strong>${u.username}</strong>${u.name ? ` (${u.name})` : ''}</td>
-        <td><span class="user-role-tag ${u.role === 'admin' ? 'admin' : ''}">${u.role === 'admin' ? '👑 관리자' : '일반회원'}</span></td>
+        <td><strong>${escapeHtml(u.username)}</strong></td>
+        <td>${escapeHtml(u.name || '-')}</td>
+        <td><span style="color:#0070F3; font-weight:800;">${escapeHtml(u.phone || '-')}</span></td>
+        <td><span class="user-role-tag">${escapeHtml(u.telecom || 'SKT')}</span></td>
+        <td style="color:#6B7684; font-size:0.75rem;">${escapeHtml(u.email || '-')}</td>
+        <td>${escapeHtml(u.ageGroup || '-')} / ${escapeHtml(u.gender || '-')}</td>
+        <td><strong>${escapeHtml(u.region || '-')}</strong></td>
+        <td style="color:#FF6B00; font-weight:700;">${escapeHtml(u.interest || '-')}</td>
+        <td><span style="font-size:0.75rem;">${escapeHtml(u.marketingConsent || '미동의')}</span></td>
         <td><strong style="color: ${u.role === 'admin' ? '#FF9800' : '#00B14F'}">${u.remainingSpins}</strong></td>
-        <td>${u.couponCount}개</td>
         <td style="color:#888; font-size:0.75rem;">${u.createdAt ? u.createdAt.split('T')[0] : '-'}</td>
+        <td style="color:#888; font-size:0.72rem; font-family:monospace;">${escapeHtml(u.registeredIp || '-')}</td>
       </tr>
     `).join('');
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:red; text-align:center;">목록 조회 오류</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="color:red; text-align:center; padding:16px;">목록 조회 오류</td></tr>';
+  }
+}
+
+async function loadAdminAnalytics() {
+  if (!currentUser) return;
+  const tabVisitCount = document.getElementById('adminTabVisitCount');
+  const todayEl = document.getElementById('analyticsTodayVisits');
+  const totalEl = document.getElementById('analyticsTotalVisits');
+  const topChannelEl = document.getElementById('analyticsTopChannel');
+  const topChannelDesc = document.getElementById('analyticsTopChannelDesc');
+  const totalMembersEl = document.getElementById('analyticsTotalMembers');
+  const channelBars = document.getElementById('analyticsChannelBars');
+  const deviceBars = document.getElementById('analyticsDeviceBars');
+  const logsBody = document.getElementById('adminAnalyticsLogsBody');
+
+  try {
+    const res = await fetch(`/api/admin/analytics?admin=${encodeURIComponent(currentUser.username)}`);
+    const data = await res.json();
+    if (!data.success) return;
+
+    if (tabVisitCount) tabVisitCount.textContent = `${data.totalVisits}건`;
+    if (todayEl) todayEl.textContent = `${data.todayVisits}명`;
+    if (totalEl) totalEl.textContent = `${data.totalVisits}회`;
+    if (totalMembersEl) totalMembersEl.textContent = `${data.totalUsers}명`;
+
+    // 채널 1위 찾기
+    const channels = Object.entries(data.channels || {}).sort((a, b) => b[1] - a[1]);
+    if (channels.length > 0) {
+      if (topChannelEl) topChannelEl.textContent = channels[0][0];
+      if (topChannelDesc) topChannelDesc.textContent = `총 ${channels[0][1]}회 유입 기록`;
+    }
+
+    // 채널 바 렌더링
+    if (channelBars) {
+      if (channels.length === 0) {
+        channelBars.innerHTML = '<div style="color:#888; font-size:0.8rem;">아직 수집된 유입 경로가 없습니다.</div>';
+      } else {
+        const maxCh = Math.max(...channels.map(c => c[1]), 1);
+        channelBars.innerHTML = channels.map(([ch, cnt]) => {
+          const pct = Math.round((cnt / (data.totalVisits || 1)) * 100);
+          return `
+            <div class="bar-row">
+              <div class="bar-labels">
+                <span>${escapeHtml(ch)}</span>
+                <span>${cnt}회 (${pct}%)</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width: ${Math.max(5, (cnt / maxCh) * 100)}%;"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // 기기 바 렌더링
+    if (deviceBars) {
+      const devices = Object.entries(data.devices || {}).sort((a, b) => b[1] - a[1]);
+      if (devices.length === 0) {
+        deviceBars.innerHTML = '<div style="color:#888; font-size:0.8rem;">기기 정보 없음</div>';
+      } else {
+        const maxDev = Math.max(...devices.map(d => d[1]), 1);
+        deviceBars.innerHTML = devices.map(([dev, cnt]) => {
+          const pct = Math.round((cnt / (data.totalVisits || 1)) * 100);
+          return `
+            <div class="bar-row">
+              <div class="bar-labels">
+                <span>${escapeHtml(dev)}</span>
+                <span>${cnt}회 (${pct}%)</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill blue" style="width: ${Math.max(5, (cnt / maxDev) * 100)}%;"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // 최근 방문자 상세 로그 렌더링
+    if (logsBody) {
+      if (!data.recentLogs || data.recentLogs.length === 0) {
+        logsBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:16px;">방문자 기록이 없습니다.</td></tr>';
+      } else {
+        logsBody.innerHTML = data.recentLogs.map(l => `
+          <tr>
+            <td style="font-size:0.75rem; color:#888;">${escapeHtml(l.timeKST || l.timestamp || '-')}</td>
+            <td><strong style="color:#FF6B00;">${escapeHtml(l.sourceChannel || '직접 접속')}</strong></td>
+            <td style="font-family:monospace; font-size:0.75rem;">${escapeHtml(l.ip || '-')}</td>
+            <td>${escapeHtml(l.deviceType || '-')}</td>
+            <td>${escapeHtml(l.browser || '-')} / ${escapeHtml(l.os || '-')}</td>
+            <td style="font-size:0.72rem; color:#666;">${escapeHtml(l.screen || '-')}</td>
+            <td style="font-size:0.72rem; color:#888; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(l.url || l.referrer || '')}">${escapeHtml(l.url || l.referrer || '-')}</td>
+          </tr>
+        `).join('');
+      }
+    }
+  } catch (e) {
+    console.error('애널리틱스 로드 실패:', e);
   }
 }
 
@@ -2193,7 +2181,9 @@ window.submitRegister = submitRegister;
 window.logoutUser = logoutUser;
 window.openAdminModal = openAdminModal;
 window.closeAdminModal = closeAdminModal;
+window.switchAdminTab = switchAdminTab;
 window.loadAdminUserList = loadAdminUserList;
+window.loadAdminAnalytics = loadAdminAnalytics;
 window.adminRechargeUserSpins = adminRechargeUserSpins;
 
 // 충전 및 결제 함수 전역 노출
@@ -2493,9 +2483,12 @@ window.checkReferralQueryParam = checkReferralQueryParam;
   try {
     const payload = {
       screen: `${window.screen.width}x${window.screen.height} (${window.devicePixelRatio || 1}x)`,
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
       language: navigator.language || navigator.userLanguage || 'ko-KR',
       referrer: document.referrer || '직접 방문',
-      url: window.location.href
+      url: window.location.href,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul',
+      connection: (navigator.connection && (navigator.connection.effectiveType || navigator.connection.type)) || 'unknown'
     };
 
     fetch('/api/track-visit', {
