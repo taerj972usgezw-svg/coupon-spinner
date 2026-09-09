@@ -925,14 +925,14 @@ app.post('/api/spin/recharge', (req, res) => {
       return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
     }
 
-    // 기본 20,000원에 10회 스핀 지급
-    const addCount = parseInt(spins, 10) || 10;
+    // 기본 20,000원에 1회 스핀 지급
+    const addCount = parseInt(spins, 10) || 1;
     user.remainingSpins = (user.remainingSpins || 0) + addCount;
     user.lastResetAt = Date.now();
     if (!user.rechargeHistory) user.rechargeHistory = [];
     user.rechargeHistory.unshift({
       orderId: 'ORD-' + Date.now().toString(36).toUpperCase(),
-      name: '프리미엄 럭키 스핀 10회 패키지',
+      name: '프리미엄 럭키 스핀 1회 충전권',
       amount: amount || '20,000원',
       spinsAdded: addCount,
       paymentMethod: paymentMethod || '간편결제',
@@ -945,7 +945,7 @@ app.post('/api/spin/recharge', (req, res) => {
 
     res.json({
       success: true,
-      message: '20,000원 결제가 정상 승인되었습니다! 럭키 스핀 10회가 충전되었습니다.',
+      message: '20,000원 결제가 정상 승인되었습니다! 럭키 스핀 1회가 충전되었습니다.',
       remainingSpins: user.role === 'admin' ? 999999 : user.remainingSpins,
       spinsAdded: addCount
     });
