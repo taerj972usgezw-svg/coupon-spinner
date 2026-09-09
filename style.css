@@ -1517,17 +1517,26 @@ input, select {
 
 @media (max-width: 640px) {
   .header-inner {
-    padding: 0 10px;
-    height: 54px;
-    gap: 6px;
+    padding: 0 8px;
+    height: 52px;
+    gap: 5px;
   }
 
   .nav {
     display: none;
   }
 
+  .logo {
+    gap: 4px;
+  }
+
+  .logo-icon {
+    font-size: 1.25rem;
+  }
+
   .logo-title {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
+    letter-spacing: -0.02em;
   }
 
   .logo-tag {
@@ -1535,49 +1544,115 @@ input, select {
   }
 
   .header-right {
-    gap: 5px;
+    gap: 4px;
   }
 
   .btn-share-header {
     display: none;
   }
 
+  .btn-invite-pill {
+    padding: 4px 7px;
+    font-size: 0.72rem;
+  }
+
   .btn-my-wallet {
-    padding: 5px 8px;
-    font-size: 0.74rem;
+    padding: 4px 7px;
+    font-size: 0.72rem;
   }
 
   .btn-auth-login {
-    padding: 5px 8px;
-    font-size: 0.74rem;
+    padding: 4px 8px;
+    font-size: 0.72rem;
   }
 
   .btn-auth-register {
-    padding: 5px 9px;
-    font-size: 0.74rem;
+    padding: 4px 8px;
+    font-size: 0.72rem;
+  }
+
+  .user-badge-pill {
+    padding: 3px 6px;
+    gap: 4px;
+  }
+
+  .user-name-text {
+    font-size: 0.72rem;
+    max-width: 58px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .btn-admin-panel {
+    padding: 4px 7px;
+    font-size: 0.72rem;
+  }
+
+  .btn-auth-logout {
+    padding: 3px 5px;
+    font-size: 0.68rem;
   }
 
   .hero-section {
-    padding: 36px 0 50px;
+    padding: 24px 0 40px;
+  }
+
+  .hero-title {
+    font-size: clamp(1.6rem, 5.5vw, 2.3rem);
+    line-height: 1.25;
+  }
+
+  .hero-subtitle {
+    font-size: 0.88rem;
+    margin-bottom: 16px;
+  }
+
+  .chance-status-card {
+    padding: 12px 14px;
+    margin: 0 auto 18px;
+  }
+
+  .chance-number {
+    font-size: 1.5rem;
+  }
+
+  /* 룰렛 모바일 완벽 자동 스케일링 (화면 밖 잘림 원천 차단) */
+  .wheel-stage {
+    padding: 12px 0 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
   }
 
   .wheel-outer-ring {
-    width: 320px;
-    height: 320px;
+    width: min(320px, calc(100vw - 32px));
+    height: min(320px, calc(100vw - 32px));
+    margin: 0 auto;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   }
 
   .wheel-canvas-container {
-    width: 300px;
-    height: 300px;
+    width: calc(100% - 16px);
+    height: calc(100% - 16px);
+    margin: auto;
+    position: absolute;
+    top: 0; bottom: 0; left: 0; right: 0;
   }
 
   .wheel-center-btn {
-    width: 70px;
-    height: 70px;
+    width: clamp(60px, 18vw, 72px);
+    height: clamp(60px, 18vw, 72px);
+  }
+
+  .btn-spin-icon {
+    font-size: 1.15rem;
   }
 
   .btn-spin-label {
-    font-size: 0.85rem;
+    font-size: 0.78rem;
   }
 
   .section-title-wrap {
@@ -1595,7 +1670,7 @@ input, select {
 
   .footer-top-row {
     flex-direction: column;
-    gap: 24px;
+    gap: 20px;
   }
 }
 
@@ -2820,7 +2895,27 @@ input, select {
 
 @media (max-width: 480px) {
   .attendance-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+
+  .stamp-item {
+    padding: 10px 4px;
+    gap: 6px;
+  }
+
+  .stamp-circle {
+    width: 40px;
+    height: 40px;
+    font-size: 0.74rem;
+  }
+
+  .stamp-day {
+    font-size: 0.72rem;
+  }
+
+  .stamp-reward {
+    font-size: 0.65rem;
   }
 }
 
@@ -3683,5 +3778,170 @@ input, select {
 
 .bar-fill.blue {
   background: linear-gradient(90deg, #0070F3, #00C6FF);
+}
+
+/* ── 32. 모바일 초정밀 반응형 UI/UX 최적화 (스마트폰 최적화) ── */
+@media (max-width: 600px) {
+  /* 전역 뷰포트 & 터치 스크롤 */
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .container {
+    padding: 0 14px;
+  }
+
+  /* 모든 모달 다이얼로그 모바일 최적화 */
+  .modal-dialog,
+  .reg-wide-dialog,
+  .admin-super-dialog,
+  .referral-modal-dialog,
+  .recharge-modal-dialog,
+  .ticket-modal-dialog,
+  .chat-modal-dialog {
+    width: 94% !important;
+    max-width: 94% !important;
+    margin: 12px auto !important;
+    max-height: 88vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: var(--radius-lg) !important;
+  }
+
+  .modal-body, .admin-modal-body, .referral-modal-body {
+    padding: 16px 14px !important;
+  }
+
+  /* 간편 회원가입 폼 모바일 세로 1열 완벽 정렬 & 터치 타겟 46px */
+  .reg-form-grid,
+  .reg-form-grid-three {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .form-field input,
+  .form-select,
+  .form-textarea {
+    height: 46px !important;
+    font-size: 0.92rem !important;
+    padding: 10px 12px !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  .btn-primary-auth {
+    height: 48px !important;
+    font-size: 0.98rem !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  .checkbox-row {
+    font-size: 0.74rem !important;
+    padding: 3px 0;
+  }
+
+  .terms-check-box {
+    padding: 10px !important;
+    margin: 10px 0 14px !important;
+  }
+
+  /* 당첨 모달 버튼 모바일 최적화 */
+  .ticket-btn-row {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  .btn-ticket-download,
+  .btn-ticket-use,
+  .btn-ticket-share,
+  .btn-ticket-again {
+    padding: 13px !important;
+    font-size: 0.92rem !important;
+  }
+
+  /* 당첨 티켓 바코드 */
+  .ticket-barcode-box {
+    padding: 12px !important;
+  }
+
+  .barcode-stripes-img {
+    height: 44px !important;
+  }
+
+  .barcode-num-text {
+    font-size: 0.92rem !important;
+    letter-spacing: 0.08em !important;
+  }
+
+  /* 플로팅 고객센터 버튼 안전영역(Safe Area) 및 컴팩트 크기 */
+  .floating-chat-btn {
+    bottom: max(14px, env(safe-area-inset-bottom, 14px)) !important;
+    right: 14px !important;
+    padding: 9px 14px !important;
+    font-size: 0.82rem !important;
+    gap: 6px !important;
+    box-shadow: 0 6px 18px rgba(255, 43, 68, 0.4) !important;
+  }
+
+  /* 실시간 당첨자 알림 토스트 모바일 위치 */
+  .live-winner-toast {
+    left: 12px !important;
+    right: 12px !important;
+    bottom: max(68px, calc(env(safe-area-inset-bottom, 0px) + 68px)) !important;
+    max-width: calc(100vw - 24px) !important;
+    padding: 9px 12px !important;
+    font-size: 0.76rem !important;
+  }
+
+  /* 명예의 전당 포디움 카드 모바일 컴팩트 */
+  .podium-card {
+    padding: 16px 14px !important;
+  }
+
+  .podium-crown {
+    font-size: 1.8rem !important;
+    margin-bottom: 4px !important;
+  }
+
+  .podium-amount {
+    font-size: 1.15rem !important;
+  }
+
+  /* 관리자 탭 네비게이션 모바일 스와이프 */
+  .admin-tabs-bar {
+    padding: 0 10px !important;
+    gap: 4px !important;
+  }
+
+  .admin-tab-btn {
+    padding: 10px 12px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .admin-analytics-summary-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .admin-metric-card {
+    padding: 10px 12px !important;
+  }
+
+  .metric-val {
+    font-size: 1.25rem !important;
+  }
+
+  /* 리뷰 섹션 모바일 정렬 */
+  .review-header-wrap {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .review-action-box {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
 }
 
