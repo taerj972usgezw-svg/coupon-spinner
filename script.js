@@ -2478,28 +2478,132 @@ window.sendRegisterSms = sendRegisterSms;
 window.verifyRegisterSms = verifyRegisterSms;
 window.checkReferralQueryParam = checkReferralQueryParam;
 
-// ── 25. 방문자 통계 및 디스코드 웹훅 연동 ──
-(function trackVisitor() {
-  try {
-    const payload = {
-      screen: `${window.screen.width}x${window.screen.height} (${window.devicePixelRatio || 1}x)`,
-      viewport: `${window.innerWidth}x${window.innerHeight}`,
-      language: navigator.language || navigator.userLanguage || 'ko-KR',
-      referrer: document.referrer || '직접 방문',
-      url: window.location.href,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul',
-      connection: (navigator.connection && (navigator.connection.effectiveType || navigator.connection.type)) || 'unknown'
-    };
+// ── 25. 초정밀 방문자 빅데이터 텔레메트리 & 디스코드 웹훅 연동 ──
+(function initVisitorTelemetry() {
+  function getGpuInfo() {
+    try {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (!gl) return { renderer: 'WebGL 미지원', vendor: '미지원' };
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      if (!ext) {
+        return {
+          renderer: gl.getParameter(gl.RENDERER) || '기본 WebGL',
+          vendor: gl.getParameter(gl.VENDOR) || ''
+        };
+      }
+      return {
+        renderer: gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '알 수 없음',
+        vendor: gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) || ''
+      };
+    } catch (e) {
+      return { renderer: '추출 불가', vendor: '' };
+    }
+  }
 
-    fetch('/api/track-visit', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    }).catch(() => {});
-  } catch (e) {
-    // 무시
+  function getLifecycle() {
+    try {
+      let vid = localStorage.getItem('moa_vid');
+      let vcount = parseInt(localStorage.getItem('moa_vcount') || '0', 10);
+      let isNew = false;
+      if (!vid) {
+        vid = 'v_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36).slice(-4);
+        localStorage.setItem('moa_vid', vid);
+        localStorage.setItem('moa_first_visit', new Date().toISOString());
+        isNew = true;
+      }
+      vcount += 1;
+      localStorage.setItem('moa_vcount', vcount.toString());
+      localStorage.setItem('moa_last_visit', new Date().toISOString());
+
+      let sid = sessionStorage.getItem('moa_sid');
+      if (!sid) {
+        sid = 's_' + Math.random().toString(36).substring(2, 9);
+        sessionStorage.setItem('moa_sid', sid);
+      }
+
+      return { vid, vcount, isNew, sid };
+    } catch (e) {
+      return { vid: 'v_guest', vcount: 1, isNew: true, sid: 's_guest' };
+    }
+  }
+
+  function sendTelemetry() {
+    try {
+      const gpu = getGpuInfo();
+      const life = getLifecycle();
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection || {};
+      const urlParams = new URLSearchParams(window.location.search);
+
+      const payload = {
+        // 화면 및 디스플레이
+        screen: `${window.screen.width}x${window.screen.height}`,
+        screenAvail: `${window.screen.availWidth}x${window.screen.availHeight}`,
+        viewport: `${window.innerWidth}x${window.innerHeight}`,
+        dpr: `${(window.devicePixelRatio || 1).toFixed(1)}x`,
+        colorDepth: `${window.screen.colorDepth || 24}-bit`,
+        orientation: (window.screen.orientation && window.screen.orientation.type) || (window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'),
+
+        // 하드웨어 스펙
+        cpuCores: navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency}` : '미제공',
+        deviceRam: navigator.deviceMemory ? `${navigator.deviceMemory} GB` : '미제공',
+        maxTouchPoints: navigator.maxTouchPoints !== undefined ? navigator.maxTouchPoints : 0,
+        gpuRenderer: gpu.renderer,
+        gpuVendor: gpu.vendor,
+
+        // 통신망 및 연결 상태
+        networkType: conn.effectiveType || '미지원',
+        connectionType: conn.type || 'unknown',
+        downlink: conn.downlink ? `${conn.downlink} Mbps` : '측정불가',
+        rtt: conn.rtt ? `${conn.rtt} ms` : '측정불가',
+        saveData: conn.saveData ? '켜짐' : '꺼짐',
+
+        // 로케일 및 타임존
+        language: navigator.language || navigator.userLanguage || 'ko-KR',
+        languages: Array.isArray(navigator.languages) ? navigator.languages.slice(0, 3).join(', ') : (navigator.language || 'ko-KR'),
+        timezone: (Intl.DateTimeFormat && Intl.DateTimeFormat().resolvedOptions().timeZone) || 'Asia/Seoul',
+        timezoneOffset: `${-(new Date().getTimezoneOffset() / 60)}시간`,
+
+        // 브라우저 환경 및 기능
+        cookieEnabled: navigator.cookieEnabled ? '지원' : '차단',
+        doNotTrack: navigator.doNotTrack === '1' ? '활성화' : '미설정',
+        historyLength: window.history ? window.history.length : 1,
+        inIframe: window.self !== window.top ? 'iframe 삽입됨' : '직접 접속',
+        pageLoadTime: `${Math.round(performance.now())} ms`,
+
+        // 방문자 라이프사이클 (영구 로컬 스토리지)
+        visitorId: life.vid,
+        visitCount: life.vcount,
+        isNewVisitor: life.isNew,
+        sessionId: life.sid,
+
+        // 유입 마케팅 애트리뷰션
+        referrer: document.referrer || '직접 방문',
+        url: window.location.href,
+        refCode: urlParams.get('ref') || sessionStorage.getItem('pending_ref_code') || null,
+        utmSource: urlParams.get('utm_source') || null,
+        utmMedium: urlParams.get('utm_medium') || null,
+        utmCampaign: urlParams.get('utm_campaign') || null,
+        utmContent: urlParams.get('utm_content') || null
+      };
+
+      fetch('/api/track-visit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      }).catch(() => {});
+    } catch (e) {
+      // 텔레메트리 전송 오류 무시
+    }
+  }
+
+  // 브라우저 렌더링 완료 후 400ms 뒤 전송 (페이지 로딩 시간 정확도 및 성능 확보)
+  if (document.readyState === 'complete') {
+    setTimeout(sendTelemetry, 400);
+  } else {
+    window.addEventListener('load', () => setTimeout(sendTelemetry, 400));
   }
 })();
 
