@@ -292,59 +292,134 @@ app.post('/api/track-visit', (req, res) => {
       '알 수 없음'
     ).replace(/^::ffff:/, '');
 
-    // 2. 브라우저/클라이언트에서 전달받은 정보
-    const clientData = req.body || {};
-    const screenRes = clientData.screen || '알 수 없음';
-    const viewportRes = clientData.viewport || '알 수 없음';
-    const language  = clientData.language || req.headers['accept-language']?.split(',')[0] || 'ko-KR';
-    const referrer  = clientData.referrer || req.headers['referer'] || '직접 방문 (주소창 입력/즐겨찾기)';
-    const currentUrl = clientData.url || `http://${req.headers.host || 'www.쿠폰.온라인.한국'}${req.originalUrl}`;
-    const ua = req.headers['user-agent'] || '알 수 없음';
-    const sessionId = clientData.sessionId || uuidv4().substring(0, 8);
-    const refCode = clientData.refCode || null;
+    // 2. 브라우저/클라이언트에서 전달받은 방대한 합법적 텔레메트리 빅데이터
+    const c = req.body || {};
+    const screenRes    = c.screen || '알 수 없음';
+    const screenAvail  = c.screenAvail || screenRes;
+    const viewportRes  = c.viewport || '알 수 없음';
+    const dpr          = c.dpr || '1.0x';
+    const colorDepth   = c.colorDepth || '24-bit';
+    const orientation  = c.orientation || 'portrait';
+    
+    const cpuCores     = c.cpuCores || '미제공';
+    const deviceRam    = c.deviceRam || '미제공';
+    const maxTouch     = (c.maxTouchPoints !== undefined) ? c.maxTouchPoints : '미제공';
+    const gpuRenderer  = c.gpuRenderer || '미지원/알 수 없음';
+    const gpuVendor    = c.gpuVendor || '';
+    
+    const networkType  = c.networkType || '미지원';
+    const downlink     = c.downlink || '측정불가';
+    const rtt          = c.rtt || '측정불가';
+    const saveData     = c.saveData || '꺼짐';
+    
+    const language     = c.language || req.headers['accept-language']?.split(',')[0] || 'ko-KR';
+    const languages    = c.languages || language;
+    const timezone     = c.timezone || 'Asia/Seoul';
+    const timezoneOff  = c.timezoneOffset || '+9시간';
+    
+    const cookieOk     = c.cookieEnabled || '지원';
+    const dnt          = c.doNotTrack || '미설정';
+    const pageLoadMs   = c.pageLoadTime || '측정불가';
+    const historyLen   = c.historyLength || 1;
+    const inIframe     = c.inIframe || '직접 접속';
+    
+    const visitorId    = c.visitorId || ('v_' + uuidv4().substring(0, 8));
+    const visitCount   = parseInt(c.visitCount || '1', 10);
+    const isNewVisitor = !!c.isNewVisitor || (visitCount <= 1);
+    const sessionId    = c.sessionId || uuidv4().substring(0, 8);
+    
+    const referrer     = c.referrer || req.headers['referer'] || '직접 방문 (주소창 입력/즐겨찾기)';
+    const currentUrl   = c.url || `http://${req.headers.host || 'www.쿠폰.온라인.한국'}${req.originalUrl}`;
+    const ua           = req.headers['user-agent'] || '알 수 없음';
+    const refCode      = c.refCode || null;
+    const utmSource    = c.utmSource || null;
+    const utmCampaign  = c.utmCampaign || null;
 
-    // 3. 간이 기기 / OS / 브라우저 파싱
+    // Cloudflare / Edge 위치 헤더
+    const cfCountry = req.headers['cf-ipcountry'] || req.headers['x-railway-edge-region'] || null;
+    const cfCity    = req.headers['cf-ipcity'] || null;
+    const geoInfo   = cfCountry ? ` (${cfCountry}${cfCity ? ' ' + cfCity : ''})` : '';
+
+    // 3. 정밀 기기 / OS / 브라우저 / 인앱 파싱
     let deviceType = '💻 PC / 데스크톱';
-    if (/iphone/i.test(ua)) deviceType = '📱 iPhone';
-    else if (/ipad/i.test(ua)) deviceType = '📟 iPad';
-    else if (/android/i.test(ua)) {
+    if (/iphone/i.test(ua)) {
+      deviceType = '📱 Apple iPhone';
+      if (/iphone15|iphone 15/i.test(ua)) deviceType = '📱 Apple iPhone 15 시리즈';
+      else if (/iphone14|iphone 14/i.test(ua)) deviceType = '📱 Apple iPhone 14 시리즈';
+      else if (/iphone13|iphone 13/i.test(ua)) deviceType = '📱 Apple iPhone 13 시리즈';
+    } else if (/ipad/i.test(ua)) {
+      deviceType = '📟 Apple iPad';
+    } else if (/sm-s9/i.test(ua)) {
+      deviceType = '📱 삼성 갤럭시 S23/S24 시리즈';
+    } else if (/sm-g9/i.test(ua)) {
+      deviceType = '📱 삼성 갤럭시 S20/S21/S22 시리즈';
+    } else if (/sm-f/i.test(ua)) {
+      deviceType = '📱 삼성 갤럭시 Z 폴드/플립 시리즈';
+    } else if (/sm-a/i.test(ua)) {
+      deviceType = '📱 삼성 갤럭시 A 시리즈';
+    } else if (/pixel/i.test(ua)) {
+      deviceType = '📱 Google Pixel 스마트폰';
+    } else if (/android/i.test(ua)) {
       deviceType = /mobile/i.test(ua) ? '📱 Android 스마트폰' : '📟 Android 태블릿';
     }
 
     let os = '기타 OS';
-    if (/windows/i.test(ua)) os = '🪟 Windows';
+    if (/windows nt 10\.0/i.test(ua)) os = '🪟 Windows 10/11';
+    else if (/windows/i.test(ua)) os = '🪟 Windows';
     else if (/macintosh|mac os x/i.test(ua)) os = '🍎 macOS';
-    else if (/iphone|ipad|ipod/i.test(ua)) os = '🍎 iOS';
-    else if (/android/i.test(ua)) os = '🤖 Android';
-    else if (/linux/i.test(ua)) os = '🐧 Linux';
+    else if (/iphone|ipad|ipod/i.test(ua)) {
+      const iosMatch = ua.match(/os (\d+_\d+)/i);
+      os = iosMatch ? `🍎 iOS ${iosMatch[1].replace('_', '.')}` : '🍎 iOS';
+    } else if (/android/i.test(ua)) {
+      const andMatch = ua.match(/android (\d+(\.\d+)?)/i);
+      os = andMatch ? `🤖 Android ${andMatch[1]}` : '🤖 Android';
+    } else if (/linux/i.test(ua)) os = '🐧 Linux';
 
     let browser = '기타 브라우저';
-    if (/kakaotalk/i.test(ua)) browser = '🟡 카카오톡 인앱 브라우저';
-    else if (/naver/i.test(ua)) browser = '🟢 네이버 인앱 브라우저';
-    else if (/samsungbrowser/i.test(ua)) browser = '🌌 삼성 인터넷';
-    else if (/edg\//i.test(ua)) browser = '🌊 Microsoft Edge';
-    else if (/chrome/i.test(ua) && !/edg\//i.test(ua)) browser = '🌐 Google Chrome';
-    else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = '🧭 Apple Safari';
-    else if (/firefox/i.test(ua)) browser = '🦊 Mozilla Firefox';
+    let inAppDetail = '';
+    if (/kakaotalk/i.test(ua)) {
+      browser = '🟡 카카오톡 인앱 브라우저';
+      inAppDetail = ' [카카오톡 앱 내부 웹뷰]';
+    } else if (/instagram/i.test(ua)) {
+      browser = '📸 인스타그램 인앱 브라우저';
+      inAppDetail = ' [인스타 피드/스토리 링크]';
+    } else if (/naver/i.test(ua)) {
+      browser = '🟢 네이버 인앱 브라우저';
+      inAppDetail = ' [네이버 앱 웹뷰]';
+    } else if (/fbav|facebook/i.test(ua)) {
+      browser = '🔵 페이스북 인앱 브라우저';
+    } else if (/samsungbrowser/i.test(ua)) {
+      browser = '🌌 삼성 인터넷';
+    } else if (/edg\//i.test(ua)) {
+      browser = '🌊 Microsoft Edge';
+    } else if (/chrome/i.test(ua) && !/edg\//i.test(ua)) {
+      browser = '🌐 Google Chrome';
+    } else if (/safari/i.test(ua) && !/chrome/i.test(ua)) {
+      browser = '🧭 Apple Safari';
+    } else if (/firefox/i.test(ua)) {
+      browser = '🦊 Mozilla Firefox';
+    }
 
     // 4. 유입 채널 분석 (Referrer 및 URL 기반)
     let sourceChannel = '직접 접속 / 북마크';
     const lowerRef = referrer.toLowerCase();
     const lowerUrl = currentUrl.toLowerCase();
-    if (lowerRef.includes('kakaotalk') || lowerUrl.includes('ref=kakao')) {
-      sourceChannel = '🟡 카카오톡 공유';
-    } else if (lowerRef.includes('instagram') || lowerUrl.includes('ref=insta')) {
-      sourceChannel = '📸 인스타그램';
+    if (lowerRef.includes('kakaotalk') || lowerUrl.includes('ref=kakao') || browser.includes('카카오톡')) {
+      sourceChannel = '🟡 카카오톡 공유 유입';
+    } else if (lowerRef.includes('instagram') || lowerUrl.includes('ref=insta') || browser.includes('인스타그램')) {
+      sourceChannel = '📸 인스타그램 프로필/스토리';
     } else if (lowerRef.includes('facebook') || lowerUrl.includes('ref=fb')) {
-      sourceChannel = '🔵 페이스북';
+      sourceChannel = '🔵 페이스북 피드';
     } else if (lowerRef.includes('youtube')) {
-      sourceChannel = '🔴 유튜브';
-    } else if (lowerRef.includes('naver')) {
-      sourceChannel = '🟢 네이버';
+      sourceChannel = '🔴 유튜브 설명/댓글';
+    } else if (lowerRef.includes('naver') || browser.includes('네이버')) {
+      sourceChannel = '🟢 네이버 검색/블로그/카페';
+    } else if (lowerRef.includes('google')) {
+      sourceChannel = '🌐 구글 검색';
     } else if (lowerRef.includes('쿠폰.온라인.한국') || lowerRef.includes('xn--')) {
       sourceChannel = '🌐 유동 웹포워딩 (쿠폰.온라인.한국)';
     } else if (refCode) {
-      sourceChannel = `👥 친구초대 (${refCode})`;
+      sourceChannel = `👥 친구초대 코드 (${refCode})`;
     } else if (referrer.startsWith('http')) {
       try {
         sourceChannel = `🔗 ${new URL(referrer).hostname}`;
@@ -359,61 +434,123 @@ app.post('/api/track-visit', (req, res) => {
       .replace('T', ' ')
       .replace(/\..+/, '') + ' (KST)';
 
-    // 5. 방문자 로그 저장 (빅데이터 분석용)
+    // 5. 방문자 로그 저장 (빅데이터 분석용 영구 보존)
     const logItem = {
       id: uuidv4().substring(0, 8),
       ip: rawIp,
+      geo: geoInfo,
+      visitorId,
+      visitCount,
+      isNewVisitor,
       sessionId,
       deviceType,
       os,
-      browser,
+      browser: browser + inAppDetail,
+      gpuRenderer,
       screen: screenRes,
       viewport: viewportRes,
+      dpr,
+      colorDepth,
+      orientation,
+      cpuCores,
+      deviceRam,
+      maxTouch,
+      networkType,
+      downlink,
+      rtt,
       language,
+      languages,
+      timezone,
       referrer,
       sourceChannel,
       url: currentUrl,
       refCode,
+      utmSource,
+      utmCampaign,
+      pageLoadMs,
       timeKST: nowKST,
       timestamp: new Date().toISOString()
     };
     saveVisitLog(logItem);
 
-    // 6. 동일 IP 3분 쿨다운 체크 후 디스코드 알림
+    // 6. 동일 IP 3분 쿨다운 체크 후 디스코드 초정밀 빅데이터 웹훅 발송
     const cooldownKey = `visit_${rawIp}`;
     if (!visitAlertCache.has(cooldownKey)) {
       visitAlertCache.set(cooldownKey, true);
 
+      const embedColor = isNewVisitor ? 0xFF334B : 0x0070F3; // 신규: 강렬한 레드, 재방문: 스마트 블루
+      const visitorStatusText = isNewVisitor
+        ? '🎉 **최초 신규 방문자 유입!**'
+        : `🔄 **${visitCount}회차 재방문자 접속!**`;
+
       const embedPayload = {
-        username: '쿠폰모아 방문자 알리미',
+        username: '쿠폰모아 빅데이터 인텔리전스',
         avatar_url: 'https://cdn-icons-png.flaticon.com/512/879/879757.png',
         embeds: [
           {
-            title: '🚨 신규 방문자 접속 알림!',
-            description: `방문자가 **쿠폰모아(룰렛 이벤트)** 사이트에 접속했습니다.`,
-            color: 0xFF5722,
+            title: '🚨 [빅데이터 텔레메트리] 실시간 방문자 초정밀 인텔리전스 수집',
+            description: `${visitorStatusText}\n🎯 **유입 채널**: \`${sourceChannel}\`\n📍 **접속 URL**: ${currentUrl.substring(0, 160)}`,
+            color: embedColor,
             fields: [
-              { name: '🌐 접속 IP 주소', value: `\`${rawIp}\``, inline: true },
-              { name: '📱 기기 분류', value: deviceType, inline: true },
-              { name: '💻 OS 및 환경', value: os, inline: true },
-              { name: '🧭 브라우저', value: browser, inline: true },
-              { name: '🖥️ 화면 해상도', value: `\`${screenRes}\``, inline: true },
-              { name: '🎯 유입 경로', value: sourceChannel, inline: true },
-              { name: '🔗 접속 출처 (Referrer)', value: referrer.length > 200 ? referrer.substring(0, 200) + '...' : referrer, inline: false },
-              { name: '📍 접속 URL', value: currentUrl.length > 200 ? currentUrl.substring(0, 200) + '...' : currentUrl, inline: false },
-              { name: '⏰ 접속 일시', value: `\`${nowKST}\``, inline: false }
+              {
+                name: '👤 방문자 식별 & 세션',
+                value: `• 고유 ID: \`${visitorId}\`\n• 누적 방문: **${visitCount}회** (${isNewVisitor ? '신규' : '재방문'})\n• 세션 ID: \`${sessionId}\``,
+                inline: true
+              },
+              {
+                name: '🌐 네트워크 IP & 통신망',
+                value: `• IP: \`${rawIp}\`${geoInfo}\n• 망 종류: **${networkType}** (${downlink})\n• 지연시간: **${rtt}**`,
+                inline: true
+              },
+              {
+                name: '📱 단말기 & 운영체제(OS)',
+                value: `• 기기: **${deviceType}**\n• OS: **${os}**\n• 브라우저: **${browser}**${inAppDetail}`,
+                inline: false
+              },
+              {
+                name: '🖥️ 디스플레이 & 화면 스펙',
+                value: `• 해상도: \`${screenRes}\` (${dpr})\n• 뷰포트: \`${viewportRes}\`\n• 화면방향: \`${orientation}\` (${colorDepth})`,
+                inline: true
+              },
+              {
+                name: '⚡ CPU / RAM / 터치',
+                value: `• 프로세서: **${cpuCores} 코어**\n• 메모리(RAM): **${deviceRam}**\n• 터치포인트: **${maxTouch}개**`,
+                inline: true
+              },
+              {
+                name: '🎮 그래픽 GPU 렌더러',
+                value: `\`${gpuRenderer.length > 90 ? gpuRenderer.substring(0, 90) + '...' : gpuRenderer}\``,
+                inline: false
+              },
+              {
+                name: '🕒 로케일 & 타임존 & 시간',
+                value: `• 표준시: **${timezone}** (${timezoneOff})\n• 접속일시: \`${nowKST}\`\n• 언어: **${languages}**`,
+                inline: true
+              },
+              {
+                name: '🎯 마케팅 유입 & 레퍼러',
+                value: `• 출처(Referrer): ${referrer.length > 80 ? referrer.substring(0, 80) + '...' : referrer}\n• 추천코드: ${refCode ? '`' + refCode + '`' : '없음'}\n• UTM 캠페인: ${utmSource ? '`' + utmSource + (utmCampaign ? '/' + utmCampaign : '') + '`' : '직접유입'}`,
+                inline: true
+              },
+              {
+                name: '⚙️ 환경 & 렌더링 성능',
+                value: `• 로딩시간: \`${pageLoadMs}\`\n• 히스토리: \`${historyLen}단계\`\n• 쿠키: \`${cookieOk}\` / DNT: \`${dnt}\` / \`${inIframe}\``,
+                inline: false
+              }
             ],
-            footer: { text: '쿠폰모아 실시간 방문자 트래커 • 빅데이터 수집 중' },
+            footer: {
+              text: '쿠폰모아 실시간 합법 빅데이터 텔레메트리 엔진 • 법적 고지 준수'
+            },
             timestamp: new Date().toISOString()
           }
         ]
       };
 
       sendDiscordWebhook(embedPayload);
-      logger.info(`🔔 방문자 웹훅 발송: IP=${rawIp} 채널=${sourceChannel} 기기=${deviceType}`);
+      logger.info(`🔔 방문자 정밀 텔레메트리 발송: IP=${rawIp} VID=${visitorId} 기기=${deviceType} GPU=${gpuRenderer.substring(0, 30)}`);
     }
 
-    res.json({ success: true });
+    res.json({ success: true, visitorId, visitCount });
   } catch (err) {
     logger.error('방문자 추적 실패:', err);
     res.status(500).json({ error: '추적 실패' });
