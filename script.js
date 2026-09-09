@@ -1711,22 +1711,26 @@ function renderReviewCards(reviews) {
   if (!grid) return;
 
   grid.innerHTML = reviews.map(r => {
-    const stars = '★'.repeat(r.rating || 5) + '☆'.repeat(5 - (r.rating || 5));
+    const author = r.author || r.name || '익명 회원';
+    const item = r.item || r.badge || '럭키 쿠폰';
+    const comment = r.comment || r.text || '';
+    const timeAgo = r.timeAgo || r.date || '방금 전';
+    const stars = '★'.repeat(r.rating || 5) + '☆'.repeat(Math.max(0, 5 - (r.rating || 5)));
     return `
       <div class="review-card" data-id="${r.id}">
         <div class="review-card-top">
           <div class="review-user-info">
             <div class="review-avatar">${r.avatar || '👤'}</div>
             <div>
-              <div class="review-author-name">${escapeHtml(r.author)}</div>
-              <div class="review-item-won">당첨 상품: <strong>${escapeHtml(r.item)}</strong></div>
+              <div class="review-author-name">${escapeHtml(author)}</div>
+              <div class="review-item-won">당첨 상품: <strong>${escapeHtml(item)}</strong></div>
             </div>
           </div>
           <div class="review-rating-stars">${stars}</div>
         </div>
-        <p class="review-comment-text">${escapeHtml(r.comment)}</p>
+        <p class="review-comment-text">${escapeHtml(comment)}</p>
         <div class="review-card-footer">
-          <span class="review-time-ago">${r.timeAgo || '방금 전'}</span>
+          <span class="review-time-ago">${escapeHtml(timeAgo)}</span>
           <button type="button" class="btn-review-like" onclick="likeReview('${r.id}', this)">
             👍 도움돼요 <span class="like-count">${r.likes || 12}</span>
           </button>
@@ -1772,9 +1776,12 @@ async function submitUserReview() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         author,
+        name: author,
         item,
+        badge: item,
         rating: currentReviewRating,
-        comment
+        comment,
+        text: comment
       })
     });
     const data = await res.json();
