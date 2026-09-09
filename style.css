@@ -3410,3 +3410,278 @@ input, select {
   border-radius: var(--radius-sm);
 }
 
+/* ── 30. 간편 회원가입 다채로운 프로필 수집 폼 ── */
+.reg-wide-dialog {
+  max-width: 520px !important;
+}
+
+.auth-subtitle {
+  display: block;
+  font-size: 0.75rem;
+  color: #00B14F;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.reg-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.reg-form-grid-three {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 540px) {
+  .reg-form-grid, .reg-form-grid-three {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+.req-star {
+  color: #FF2B44;
+  font-weight: 900;
+}
+
+.terms-check-box {
+  background: #F8F9FA;
+  border: 1px solid #E5E8EB;
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin: 14px 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #4E5968;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  cursor: pointer;
+  accent-color: #FF2B44;
+}
+
+.check-text strong {
+  color: #191F28;
+}
+
+/* ── 31. 최고 관리자 전용 멀티 탭 빅데이터 대시보드 ── */
+.admin-super-dialog {
+  max-width: 1050px !important;
+  width: 95% !important;
+}
+
+.admin-tabs-bar {
+  display: flex;
+  background: #111520;
+  border-bottom: 2px solid #2D3748;
+  padding: 0 16px;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.admin-tab-btn {
+  padding: 12px 18px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.admin-tab-btn:hover {
+  color: #FFFFFF;
+}
+
+.admin-tab-btn.active {
+  color: #FFD54F;
+  border-bottom-color: #FFD54F;
+  background: rgba(255, 213, 79, 0.08);
+}
+
+.admin-tab-panel {
+  display: block;
+}
+
+.admin-header-title-box h4 {
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #191F28;
+  margin-bottom: 3px;
+}
+
+.admin-header-sub {
+  font-size: 0.78rem;
+  color: #6B7684;
+}
+
+.admin-header-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-export-csv {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: #00B14F;
+  color: #FFFFFF;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(0, 177, 79, 0.3);
+  transition: all 0.2s;
+}
+
+.btn-export-csv:hover {
+  background: #009643;
+  transform: translateY(-1px);
+}
+
+.admin-wide-table {
+  min-width: 900px;
+  font-size: 0.8rem;
+}
+
+.admin-wide-table th {
+  white-space: nowrap;
+  background: #F4F6F8;
+}
+
+.admin-wide-table td {
+  padding: 8px 10px;
+  vertical-align: middle;
+}
+
+.admin-analytics-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+  .admin-analytics-summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.admin-metric-card {
+  background: #F9FAFB;
+  border: 1px solid #E5E8EB;
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6B7684;
+  margin-bottom: 4px;
+}
+
+.metric-val {
+  font-size: 1.5rem;
+  font-weight: 900;
+  margin-bottom: 2px;
+}
+
+.metric-desc {
+  font-size: 0.7rem;
+  color: #8B95A1;
+}
+
+.text-orange { color: #FF6B00; }
+.text-blue { color: #0070F3; }
+.text-gold { color: #FFB300; }
+
+.admin-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .admin-charts-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-chart-box {
+  background: #F9FAFB;
+  border: 1px solid #E5E8EB;
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.admin-chart-box h5 {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #191F28;
+  margin-bottom: 12px;
+}
+
+.channel-bars-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #333D4B;
+}
+
+.bar-track {
+  width: 100%;
+  height: 8px;
+  background: #E5E8EB;
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FF6B00, #FFB300);
+  border-radius: 100px;
+  transition: width 0.4s ease;
+}
+
+.bar-fill.blue {
+  background: linear-gradient(90deg, #0070F3, #00C6FF);
+}
+
