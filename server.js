@@ -603,10 +603,83 @@ function calculateSpins(user) {
   };
 }
 
-// 1) 회원가입 API
+// ════════════════════════════════════════
+//  휴대폰 SMS 인증 캐시 (유효시간 3분)
+// ════════════════════════════════════════
+const smsVerificationCache = new NodeCache({ stdTTL: 180, checkperiod: 30 });
+
+// 0-1) 휴대폰 인증번호 발송 API (1인 1계정 중복 검사)
+app.post('/api/auth/send-sms', (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ error: '휴대폰 번호를 입력해주세요.' });
+    }
+
+    const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+    if (!/^01[016789]\d{7,8}$/.test(cleanPhone)) {
+      return res.status(400).json({ error: '올바른 휴대폰 번호 형식이 아닙니다. (예: 01012345678)' });
+    }
+
+    // 1인 1계정 원칙: 이미 가입된 휴대폰 번호인지 검사
+    const db = loadUsersData();
+    const isAlreadyRegistered = db.users.some(u => u.phone === cleanPhone);
+    if (isAlreadyRegistered) {
+      return res.status(400).json({ error: '이미 해당 휴대폰 번호로 등록된 계정이 존재합니다. (1인 1계정 원칙)' });
+    }
+
+    // 6자리 난수 인증번호 생성
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    smsVerificationCache.set(cleanPhone, { code, verified: false, expiresAt: Date.now() + 180000 });
+
+    logger.info(`📱 [SMS 발송] 수신: ${cleanPhone} | 인증번호: ${code}`);
+
+    res.json({
+      success: true,
+      message: `인증번호 [${code}]가 발송되었습니다.`,
+      code: code
+    });
+  } catch (e) {
+    logger.error('SMS 발송 실패:', e);
+    res.status(500).json({ error: '인증번호 발송 처리 중 오류가 발생했습니다.' });
+  }
+});
+
+// 0-2) 휴대폰 인증번호 확인 API
+app.post('/api/auth/verify-sms', (req, res) => {
+  try {
+    const { phone, code } = req.body;
+    if (!phone || !code) {
+      return res.status(400).json({ error: '휴대폰 번호와 인증번호를 입력해주세요.' });
+    }
+
+    const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+    const cleanCode = String(code).trim();
+
+    const cached = smsVerificationCache.get(cleanPhone);
+    if (!cached) {
+      return res.status(400).json({ error: '인증번호가 만료되었거나 발송되지 않았습니다. 다시 발송해주세요.' });
+    }
+
+    if (cached.code !== cleanCode) {
+      return res.status(400).json({ error: '인증번호 6자리가 일치하지 않습니다.' });
+    }
+
+    // 인증 완료 상태로 갱신 (10분 유예)
+    smsVerificationCache.set(cleanPhone, { ...cached, verified: true }, 600);
+
+    logger.info(`✅ [SMS 인증완료] 번호: ${cleanPhone}`);
+    res.json({ success: true, message: '휴대폰 본인 인증이 성공적으로 완료되었습니다!' });
+  } catch (e) {
+    logger.error('SMS 인증 실패:', e);
+    res.status(500).json({ error: '인증 확인 처리 중 오류가 발생했습니다.' });
+  }
+});
+
+// 1) 회원가입 API (휴대폰 인증 필수 & 1인 1계정 & 추천인 코드 보너스)
 app.post('/api/auth/register', (req, res) => {
   try {
-    const { username, password, name } = req.body;
+    const { username, password, name, phone, referralCode } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: '아이디와 비밀번호를 모두 입력해주세요.' });
     }
@@ -626,30 +699,79 @@ app.post('/api/auth/register', (req, res) => {
       return res.status(400).json({ error: '이미 존재하는 아이디입니다.' });
     }
 
+    // 휴대폰 인증 검증 (관리자 taeiyoon 제외)
+    let cleanPhone = null;
+    if (cleanUsername.toLowerCase() !== 'taeiyoon') {
+      if (!phone) {
+        return res.status(400).json({ error: '휴대폰 본인 인증이 필요합니다.' });
+      }
+      cleanPhone = String(phone).replace(/[^0-9]/g, '');
+      const smsRecord = smsVerificationCache.get(cleanPhone);
+      if (!smsRecord || !smsRecord.verified) {
+        return res.status(400).json({ error: '휴대폰 번호 인증을 먼저 완료해주세요.' });
+      }
+
+      // 1인 1계정 중복 검사
+      const phoneDuplicate = db.users.find(u => u.phone === cleanPhone);
+      if (phoneDuplicate) {
+        return res.status(400).json({ error: '이미 해당 휴대폰 번호로 등록된 계정이 있습니다. 1인 1계정만 허용됩니다.' });
+      }
+    }
+
+    // 신규 회원의 고유 추천인 코드 생성 (예: MOA-7721)
+    const myReferralCode = 'MOA-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+    // 추천인 코드 입력 시 혜택 처리 (추천인 +1스핀, 가입자 +1스핀)
+    let bonusSpin = 0;
+    let referredBy = null;
+    if (referralCode && String(referralCode).trim()) {
+      const targetRefCode = String(referralCode).trim().toUpperCase();
+      const inviter = db.users.find(u => (u.referralCode || '').toUpperCase() === targetRefCode);
+      if (inviter) {
+        inviter.remainingSpins = (inviter.remainingSpins || 0) + 1;
+        if (!inviter.referralHistory) inviter.referralHistory = [];
+        inviter.referralHistory.unshift({
+          friendUsername: cleanUsername,
+          joinedAt: new Date().toISOString()
+        });
+        bonusSpin = 1;
+        referredBy = inviter.username;
+        logger.info(`🎉 [추천인 혜택] ${inviter.username} & ${cleanUsername} 모두 스핀 +1회 지급 완료!`);
+      }
+    }
+
     const now = Date.now();
     const newUser = {
       id: uuidv4().substring(0, 10),
       username: cleanUsername,
-      password: String(password), // 지정된 계정 포맷 호환
+      password: String(password),
       name: (name || cleanUsername).substring(0, 20),
       role: (cleanUsername.toLowerCase() === 'taeiyoon') ? 'admin' : 'member',
+      phone: cleanPhone,
+      referralCode: myReferralCode,
+      referredBy: referredBy,
+      referralHistory: [],
+      attendance: { streak: 0, lastDate: null, history: [] },
       createdAt: new Date().toISOString(),
-      remainingSpins: 3,
+      remainingSpins: (cleanUsername.toLowerCase() === 'taeiyoon') ? 999999 : (3 + bonusSpin),
       lastResetAt: now,
-      savedCoupons: [] // 해당 사용자 계정의 쿠폰 보관함
+      savedCoupons: []
     };
 
     db.users.push(newUser);
     saveUsersData(db);
 
-    logger.info(`✨ 회원가입 성공: ${newUser.username} (${newUser.role})`);
+    logger.info(`✨ 회원가입 성공: ${newUser.username} (${newUser.role}, 폰: ${cleanPhone || '관리자'}, 추천코드: ${myReferralCode})`);
 
     res.json({
       success: true,
-      message: '회원가입이 완료되었습니다! 로그인해주세요.',
+      message: bonusSpin > 0 
+        ? '회원가입이 완료되었습니다! 추천인 보너스로 스핀 4회가 지급되었습니다.'
+        : '회원가입이 완료되었습니다! 3회 무료 스핀이 지급되었습니다.',
       user: {
         username: newUser.username,
-        role: newUser.role
+        role: newUser.role,
+        referralCode: newUser.referralCode
       }
     });
   } catch (e) {
@@ -1056,6 +1178,177 @@ app.post('/api/reviews', (req, res) => {
     res.json({ success: true, review: newReview });
   } catch (e) {
     res.status(500).json({ error: '리뷰 등록 실패' });
+  }
+});
+
+// 11) 친구 초대 (추천인 통계) API
+app.get('/api/referral/stats', (req, res) => {
+  try {
+    const { username } = req.query;
+    if (!username) return res.status(401).json({ error: '로그인이 필요합니다.' });
+
+    const db = loadUsersData();
+    const user = db.users.find(u => u.username.toLowerCase() === String(username).toLowerCase());
+    if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+
+    if (!user.referralCode) {
+      user.referralCode = 'MOA-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+      saveUsersData(db);
+    }
+
+    const history = user.referralHistory || [];
+    res.json({
+      success: true,
+      referralCode: user.referralCode,
+      totalInvited: history.length,
+      earnedSpins: history.length,
+      history: history.slice(0, 10)
+    });
+  } catch (e) {
+    res.status(500).json({ error: '추천 통계 조회 실패' });
+  }
+});
+
+// 12) 매일매일 출석체크 현황 조회 API
+app.get('/api/attendance/status', (req, res) => {
+  try {
+    const { username } = req.query;
+    if (!username) return res.status(401).json({ error: '로그인이 필요합니다.' });
+
+    const db = loadUsersData();
+    const user = db.users.find(u => u.username.toLowerCase() === String(username).toLowerCase());
+    if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+
+    if (!user.attendance) {
+      user.attendance = { streak: 0, lastDate: null, history: [] };
+      saveUsersData(db);
+    }
+
+    const todayKST = new Date(Date.now() + 9 * 3600 * 1000).toISOString().split('T')[0];
+    const isCheckedToday = user.attendance.lastDate === todayKST;
+
+    res.json({
+      success: true,
+      today: todayKST,
+      isCheckedToday,
+      streak: user.attendance.streak || 0,
+      history: user.attendance.history || []
+    });
+  } catch (e) {
+    res.status(500).json({ error: '출석 현황 조회 실패' });
+  }
+});
+
+// 13) 매일매일 출석체크 하기 API (3일 연속 +1스핀, 7일 연속 +2스핀)
+app.post('/api/attendance/check', (req, res) => {
+  try {
+    const { username } = req.body;
+    if (!username) return res.status(401).json({ error: '로그인이 필요합니다.' });
+
+    const db = loadUsersData();
+    const user = db.users.find(u => u.username.toLowerCase() === String(username).toLowerCase());
+    if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+
+    if (!user.attendance) user.attendance = { streak: 0, lastDate: null, history: [] };
+
+    const todayKST = new Date(Date.now() + 9 * 3600 * 1000).toISOString().split('T')[0];
+    if (user.attendance.lastDate === todayKST) {
+      return res.status(400).json({ error: '오늘 이미 출석체크를 완료하셨습니다!' });
+    }
+
+    const yesterdayDate = new Date(Date.now() + 9 * 3600 * 1000 - 24 * 3600 * 1000).toISOString().split('T')[0];
+    let newStreak = (user.attendance.lastDate === yesterdayDate) ? ((user.attendance.streak || 0) + 1) : 1;
+    if (newStreak > 7) newStreak = 1;
+
+    let bonusSpins = 0;
+    let rewardMessage = '오늘 출석체크가 완료되었습니다!';
+    if (newStreak === 3) {
+      bonusSpins = 1;
+      rewardMessage = '🎉 3일 연속 출석 달성! 보너스 스핀 +1회가 지급되었습니다!';
+    } else if (newStreak === 7) {
+      bonusSpins = 2;
+      rewardMessage = '🏆 7일 연속 출석 완주! 대박 보너스 스핀 +2회가 지급되었습니다!';
+    }
+
+    if (bonusSpins > 0 && user.role !== 'admin') {
+      user.remainingSpins = (user.remainingSpins || 0) + bonusSpins;
+    }
+
+    user.attendance.lastDate = todayKST;
+    user.attendance.streak = newStreak;
+    if (!user.attendance.history) user.attendance.history = [];
+    user.attendance.history.unshift({ date: todayKST, streak: newStreak, bonusSpins });
+
+    saveUsersData(db);
+
+    logger.info(`📅 [출석체크] ${user.username} - 연속 ${newStreak}일차 (보너스: +${bonusSpins}스핀)`);
+
+    res.json({
+      success: true,
+      message: rewardMessage,
+      streak: newStreak,
+      bonusSpins,
+      remainingSpins: user.remainingSpins,
+      isCheckedToday: true
+    });
+  } catch (e) {
+    logger.error('출석체크 실패:', e);
+    res.status(500).json({ error: '출석체크 처리 중 오류 발생' });
+  }
+});
+
+// 14) 실시간 명예의 전당 & 럭키 랭킹 (실제 회원 + 봇 자연스러운 혼합)
+const REALISTIC_BOT_WINNERS = [
+  { rank: 1, name: '김*진 (인천 송도)', item: '신세계상품권 50,000원권', category: '백화점', value: '50,000원', wonAgo: '3분 전', badge: '👑 잭팟 1위', avatar: '🥇' },
+  { rank: 2, name: '박*훈 (경기 수원)', item: 'BHC 뿌링클 + 콜라 세트', category: '치킨', value: '24,500원', wonAgo: '9분 전', badge: '🔥 인기 2위', avatar: '🥈' },
+  { rank: 3, name: '이*서 (서울 강남)', item: '올리브영 20,000원권', category: '뷰티', value: '20,000원', wonAgo: '16분 전', badge: '✨ 실속 3위', avatar: '🥉' },
+  { rank: 4, name: '최*준 (부산 해운대)', item: '도미노피자 포테이토 세트', category: '피자', value: '27,000원', wonAgo: '27분 전', badge: 'TOP 4', avatar: '🍕' },
+  { rank: 5, name: '정*우 (대전 유성)', item: '배달의민족 10,000원 상품권', category: '배달', value: '10,000원', wonAgo: '39분 전', badge: 'TOP 5', avatar: '🛵' },
+  { rank: 6, name: '윤*아 (광주 광산)', item: '스타벅스 달콤한 디저트 세트', category: '카페', value: '15,800원', wonAgo: '51분 전', badge: 'TOP 6', avatar: '☕' },
+  { rank: 7, name: '송*민 (서울 마포)', item: '맥도날드 빅맥 세트 무료', category: '버거', value: '7,200원', wonAgo: '1시간 전', badge: 'TOP 7', avatar: '🍔' },
+  { rank: 8, name: '강*호 (대구 수성)', item: '네이버페이 5,000원 포인트', category: '포인트', value: '5,000원', wonAgo: '1시간 전', badge: 'TOP 8', avatar: '💚' },
+  { rank: 9, name: '조*영 (울산 남구)', item: '배스킨라빈스 파인트 세트', category: '아이스크림', value: '9,800원', wonAgo: '2시간 전', badge: 'TOP 9', avatar: '🍨' },
+  { rank: 10, name: '한*석 (경기 성남)', item: '신세계상품권 50,000원권', category: '백화점', value: '50,000원', wonAgo: '2시간 전', badge: 'TOP 10', avatar: '💳' }
+];
+
+app.get('/api/ranking', (req, res) => {
+  try {
+    const db = loadUsersData();
+    const realWinners = [];
+
+    db.users.forEach(u => {
+      if (u.savedCoupons && u.savedCoupons.length > 0) {
+        u.savedCoupons.forEach(c => {
+          const maskedName = u.name 
+            ? (u.name.length > 2 ? u.name[0] + '*' + u.name.slice(2) : u.name[0] + '*')
+            : (u.username.substring(0, 3) + '***');
+          realWinners.push({
+            name: `${maskedName} (회원)`,
+            item: c.name || '럭키 쿠폰',
+            category: c.category || '기프티콘',
+            value: c.discount || '혜택 당첨',
+            wonAgo: c.wonAt ? '오늘 당첨' : '방금 전',
+            badge: '실제 당첨',
+            avatar: c.emoji || '🎁'
+          });
+        });
+      }
+    });
+
+    const combined = [...realWinners, ...REALISTIC_BOT_WINNERS];
+    const top10 = combined.slice(0, 10).map((w, idx) => ({
+      ...w,
+      rank: idx + 1,
+      badge: idx === 0 ? '👑 잭팟 1위' : (idx === 1 ? '🔥 인기 2위' : (idx === 2 ? '✨ 실속 3위' : `TOP ${idx + 1}`))
+    }));
+
+    res.json({
+      success: true,
+      updatedAt: new Date().toISOString(),
+      ranking: top10
+    });
+  } catch (e) {
+    res.status(500).json({ error: '랭킹 조회 실패' });
   }
 });
 
