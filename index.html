@@ -591,62 +591,140 @@
   </div>
 
   <!-- ================================================================= -->
-  <!-- 📝 신규 회원가입 모달 -->
+  <!-- 📝 신규 회원가입 모달 (간편 1인 1계정 가입 & 맞춤 혜택 정보 수집) -->
   <!-- ================================================================= -->
   <div class="modal-backdrop" id="registerModal">
-    <div class="auth-modal-dialog">
+    <div class="auth-modal-dialog reg-wide-dialog">
       <div class="auth-modal-content">
         <div class="auth-modal-header">
           <div class="auth-title-row">
             <span class="auth-icon">📝</span>
-            <h3>신규 회원가입</h3>
+            <div>
+              <h3>신규 회원가입 (무료 3회 스핀)</h3>
+              <span class="auth-subtitle">간편 가입 즉시 룰렛 무료 3회 + 친구 추천 보너스 지급!</span>
+            </div>
           </div>
           <button type="button" id="btnCloseRegisterModal" class="modal-close-icon" onclick="closeRegisterModal()">✕</button>
         </div>
         <div class="auth-modal-body">
-          <p class="auth-desc">휴대폰 본인 인증(1인 1계정 원칙) 후 24시간마다 무료 3회 스핀 혜택을 받아보세요!</p>
-          <div class="form-field">
-            <label>아이디 (3자 이상)</label>
-            <input type="text" id="regUsername" placeholder="사용할 아이디" autocomplete="username" />
-          </div>
-          <div class="form-field">
-            <label>닉네임 / 이름 (선택)</label>
-            <input type="text" id="regName" placeholder="표시될 닉네임" />
-          </div>
-          <div class="form-field">
-            <label>비밀번호 (4자 이상)</label>
-            <input type="password" id="regPassword" placeholder="비밀번호 입력" autocomplete="new-password" />
+          <div class="reg-form-grid">
+            <div class="form-field">
+              <label>아이디 <span class="req-star">*</span></label>
+              <input type="text" id="regUsername" placeholder="영문/숫자 3자 이상" autocomplete="username" />
+            </div>
+            <div class="form-field">
+              <label>비밀번호 <span class="req-star">*</span></label>
+              <input type="password" id="regPassword" placeholder="비밀번호 4자 이상" autocomplete="new-password" />
+            </div>
           </div>
 
-          <!-- 휴대폰 본인인증 (1인 1계정 원칙) -->
-          <div class="form-field">
-            <label>휴대폰 번호 (1인 1계정 인증 필수)</label>
-            <div class="phone-input-group">
+          <div class="reg-form-grid">
+            <div class="form-field">
+              <label>닉네임 / 이름</label>
+              <input type="text" id="regName" placeholder="표시될 닉네임" />
+            </div>
+            <div class="form-field">
+              <label>이메일 (기프티콘 백업용)</label>
+              <input type="email" id="regEmail" placeholder="example@naver.com" />
+            </div>
+          </div>
+
+          <!-- 휴대폰 번호 & 통신사 (1인 1계정 원칙 준수) -->
+          <div class="reg-form-grid">
+            <div class="form-field">
+              <label>휴대폰 번호 <span class="req-star">*</span> (기프티콘 발송용)</label>
               <input type="tel" id="regPhone" placeholder="01012345678 (-없이 숫자만)" maxlength="11" />
-              <button type="button" id="btnSendSms" class="btn-sms-action" onclick="sendRegisterSms()">인증번호 전송</button>
             </div>
-          </div>
-          <div class="form-field" id="smsCodeField" style="display:none;">
-            <div class="sms-label-row">
-              <label>인증번호 6자리</label>
-              <span id="smsTimerText" class="sms-timer-countdown">03:00</span>
-            </div>
-            <div class="phone-input-group">
-              <input type="text" id="regSmsCode" placeholder="인증번호 6자리 입력" maxlength="6" />
-              <button type="button" id="btnVerifySms" class="btn-sms-action confirm" onclick="verifyRegisterSms()">인증 확인</button>
-            </div>
-            <div id="smsVerifiedBadge" class="sms-verified-badge" style="display:none;">
-              ✅ 휴대폰 본인인증 완료 (1인 1계정 확인됨)
+            <div class="form-field">
+              <label>이용 통신사 <span class="req-star">*</span></label>
+              <select id="regTelecom" class="form-select">
+                <option value="SKT">SKT</option>
+                <option value="KT">KT</option>
+                <option value="LGU+">LG U+</option>
+                <option value="알뜰폰(SKT망)">알뜰폰 (SKT망)</option>
+                <option value="알뜰폰(KT망)">알뜰폰 (KT망)</option>
+                <option value="알뜰폰(LGU+망)">알뜰폰 (LG U+망)</option>
+              </select>
             </div>
           </div>
 
-          <!-- 추천인 코드 (선택) -->
-          <div class="form-field">
-            <label>추천인 코드 (선택 - 입력 시 +1회 보너스 스핀!)</label>
-            <input type="text" id="regReferralCode" placeholder="친구의 초대 코드 입력 (예: MOA-XXXX)" />
+          <!-- 연령대 & 성별 & 지역 -->
+          <div class="reg-form-grid-three">
+            <div class="form-field">
+              <label>연령대</label>
+              <select id="regAgeGroup" class="form-select">
+                <option value="10대">10대</option>
+                <option value="20대 초반" selected>20대 초반</option>
+                <option value="20대 후반">20대 후반</option>
+                <option value="30대">30대</option>
+                <option value="40대">40대</option>
+                <option value="50대 이상">50대 이상</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>성별</label>
+              <select id="regGender" class="form-select">
+                <option value="미선택">선택안함</option>
+                <option value="남성">남성</option>
+                <option value="여성">여성</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>거주 지역</label>
+              <select id="regRegion" class="form-select">
+                <option value="서울" selected>서울</option>
+                <option value="경기">경기</option>
+                <option value="인천">인천</option>
+                <option value="부산">부산</option>
+                <option value="대구">대구</option>
+                <option value="대전">대전</option>
+                <option value="광주">광주</option>
+                <option value="울산">울산</option>
+                <option value="세종">세종</option>
+                <option value="강원">강원</option>
+                <option value="충북">충북</option>
+                <option value="충남">충남</option>
+                <option value="전북">전북</option>
+                <option value="전남">전남</option>
+                <option value="경북">경북</option>
+                <option value="경남">경남</option>
+                <option value="제주">제주</option>
+              </select>
+            </div>
           </div>
 
-          <button type="button" id="btnSubmitRegister" class="btn-primary-auth" onclick="submitRegister()">회원가입 완료</button>
+          <!-- 관심 경품 & 추천인 코드 -->
+          <div class="reg-form-grid">
+            <div class="form-field">
+              <label>가장 받고 싶은 기프티콘 🎁</label>
+              <select id="regInterest" class="form-select">
+                <option value="신세계 5만원권 (백화점)">신세계 상품권 50,000원권</option>
+                <option value="BHC 치킨+콜라 세트" selected>BHC 뿌링클 + 콜라 세트</option>
+                <option value="스타벅스 달콤 디저트 세트">스타벅스 디저트 세트</option>
+                <option value="배달의민족 10,000원 상품권">배달의민족 10,000원권</option>
+                <option value="올리브영 20,000원 기프트카드">올리브영 20,000원권</option>
+                <option value="네이버페이 포인트">네이버페이 포인트</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>추천인 코드 (선택 - 입력 시 +1스핀!)</label>
+              <input type="text" id="regReferralCode" placeholder="예: MOA-XXXX" />
+            </div>
+          </div>
+
+          <!-- 개인정보 수집 및 이용 동의 (합법적 이벤트 운영 필수 요건) -->
+          <div class="terms-check-box">
+            <label class="checkbox-row">
+              <input type="checkbox" id="regTermsRequired" checked />
+              <span class="check-text"><strong>[필수]</strong> 개인정보 수집 및 이용 동의 (경품 발송 및 1인 1계정 검증용)</span>
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" id="regTermsMarketing" checked />
+              <span class="check-text"><strong>[선택]</strong> 맞춤형 이벤트/당첨 혜택 알림(SMS, 카카오 알림톡) 수신 동의</span>
+            </label>
+          </div>
+
+          <button type="button" id="btnSubmitRegister" class="btn-primary-auth" onclick="submitRegister()">3초 만에 회원가입 완료 & 스핀 받기</button>
           <div class="auth-switch-row">
             <span>이미 계정이 있으신가요?</span>
             <button type="button" id="btnSwitchToLog" class="btn-link-switch" onclick="switchToLogin()">로그인하기</button>
@@ -657,78 +735,155 @@
   </div>
 
   <!-- ================================================================= -->
-  <!-- 👑 최고 관리자 전용 대시보드 모달 (일반 회원에게는 절대 안 보임) -->
+  <!-- 👑 최고 관리자 전용 대시보드 모달 (taeiyoon 전용 빅데이터 & 회원 DB) -->
   <!-- ================================================================= -->
   <div class="modal-backdrop" id="adminModal">
-    <div class="admin-modal-dialog">
+    <div class="admin-modal-dialog admin-super-dialog">
       <div class="admin-modal-content">
         <div class="admin-modal-header">
           <div class="admin-title-row">
             <span class="admin-crown">👑</span>
             <div>
               <h3>최고 관리자 컨트롤 타워</h3>
-              <span class="admin-badge">taeiyoon 최고관리자 인증완료</span>
+              <span class="admin-badge">taeiyoon 최고관리자 • 실시간 빅데이터 수집 중</span>
             </div>
           </div>
           <button class="modal-close-icon" onclick="closeAdminModal()">✕</button>
         </div>
 
+        <!-- 탭 네비게이션 -->
+        <div class="admin-tabs-bar">
+          <button type="button" class="admin-tab-btn active" id="tabBtnUsers" onclick="switchAdminTab('users')">👥 수집 회원 DB (<span id="adminTabUserCount">0</span>)</button>
+          <button type="button" class="admin-tab-btn" id="tabBtnAnalytics" onclick="switchAdminTab('analytics')">📊 실시간 방문자 빅데이터 (<span id="adminTabVisitCount">0</span>)</button>
+          <button type="button" class="admin-tab-btn" id="tabBtnRecharge" onclick="switchAdminTab('recharge')">⚡ 회원 스핀 즉시 충전</button>
+        </div>
+
         <div class="admin-modal-body">
-          <div class="admin-status-cards">
-            <div class="admin-card">
-              <span class="admin-card-label">스핀 권한</span>
-              <span class="admin-card-val text-green">무제한 (∞)</span>
-              <span class="admin-card-desc">스핀 횟수 무한 테스트 가능</span>
-            </div>
-            <div class="admin-card">
-              <span class="admin-card-label">총 가입 회원</span>
-              <span class="admin-card-val" id="adminTotalUsers">0명</span>
-              <span class="admin-card-desc">실시간 등록 회원수</span>
-            </div>
-          </div>
-
-          <!-- 회원 스핀 즉시 충전 관리 -->
-          <div class="admin-sub-section">
-            <h4>⚡ 특정 회원 스핀 강제 충전</h4>
-            <div class="admin-quick-recharge-row">
-              <input type="text" id="adminTargetUser" placeholder="회원 아이디 입력" />
-              <select id="adminAddCount">
-                <option value="3">+3회 지급</option>
-                <option value="5">+5회 지급</option>
-                <option value="10">+10회 지급</option>
-                <option value="999">+무제한</option>
-              </select>
-              <button class="btn-admin-action" onclick="adminRechargeUserSpins()">스핀 지급</button>
-            </div>
-          </div>
-
-          <!-- 등록 회원 리스트 -->
-          <div class="admin-sub-section">
+          <!-- 탭 1: 수집 회원 DB 리스트 -->
+          <div class="admin-tab-panel active" id="adminTabPanelUsers">
             <div class="admin-list-header">
-              <h4>👥 전체 회원 현황</h4>
-              <button class="btn-refresh-list" onclick="loadAdminUserList()">새로고침</button>
+              <div class="admin-header-title-box">
+                <h4>👥 실시간 가입 회원 상세 DB</h4>
+                <span class="admin-header-sub">수집된 전화번호, 통신사, 이메일, 연령, 지역 등 모든 데이터를 실시간 조회합니다.</span>
+              </div>
+              <div class="admin-header-btn-group">
+                <a href="/api/admin/export-users-csv?admin=taeiyoon" class="btn-export-csv" target="_blank">📥 Excel(CSV) 전체 다운로드</a>
+                <button type="button" class="btn-refresh-list" onclick="loadAdminUserList()">새로고침</button>
+              </div>
             </div>
             <div class="admin-user-table-wrap">
-              <table class="admin-user-table">
+              <table class="admin-user-table admin-wide-table">
                 <thead>
                   <tr>
                     <th>아이디</th>
-                    <th>권한</th>
-                    <th>남은 스핀</th>
-                    <th>쿠폰수</th>
+                    <th>이름</th>
+                    <th>전화번호</th>
+                    <th>통신사</th>
+                    <th>이메일</th>
+                    <th>연령/성별</th>
+                    <th>지역</th>
+                    <th>관심경품</th>
+                    <th>마케팅</th>
+                    <th>남은스핀</th>
                     <th>가입일시</th>
+                    <th>가입IP</th>
                   </tr>
                 </thead>
                 <tbody id="adminUserTableBody">
-                  <tr><td colspan="5" style="text-align:center;">불러오는 중...</td></tr>
+                  <tr><td colspan="12" style="text-align:center;">회원 목록 조회 중...</td></tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <!-- 탭 2: 실시간 방문자 빅데이터 & 유입 로그 -->
+          <div class="admin-tab-panel" id="adminTabPanelAnalytics" style="display:none;">
+            <div class="admin-analytics-summary-grid">
+              <div class="admin-metric-card">
+                <span class="metric-label">오늘 방문자</span>
+                <span class="metric-val text-orange" id="analyticsTodayVisits">0명</span>
+                <span class="metric-desc">KST 오늘 접속 수</span>
+              </div>
+              <div class="admin-metric-card">
+                <span class="metric-label">누적 총 접속</span>
+                <span class="metric-val text-blue" id="analyticsTotalVisits">0회</span>
+                <span class="metric-desc">서버 가동 누적</span>
+              </div>
+              <div class="admin-metric-card">
+                <span class="metric-label">주요 유입 채널 1위</span>
+                <span class="metric-val text-green" id="analyticsTopChannel">-</span>
+                <span class="metric-desc" id="analyticsTopChannelDesc">가장 많은 방문 출처</span>
+              </div>
+              <div class="admin-metric-card">
+                <span class="metric-label">총 가입 회원</span>
+                <span class="metric-val text-gold" id="analyticsTotalMembers">0명</span>
+                <span class="metric-desc">수집된 유효 회원</span>
+              </div>
+            </div>
+
+            <!-- 유입 채널 & 기기 비율 -->
+            <div class="admin-charts-row">
+              <div class="admin-chart-box">
+                <h5>🎯 유입 채널별 방문자 비중</h5>
+                <div class="channel-bars-wrap" id="analyticsChannelBars">
+                  <div style="color:#888; font-size:0.82rem;">집계 중...</div>
+                </div>
+              </div>
+              <div class="admin-chart-box">
+                <h5>📱 접속 기기 / OS 비중</h5>
+                <div class="channel-bars-wrap" id="analyticsDeviceBars">
+                  <div style="color:#888; font-size:0.82rem;">집계 중...</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 최근 실시간 방문자 로그 50건 -->
+            <div class="admin-list-header" style="margin-top:20px;">
+              <h4>⏱️ 실시간 상세 방문자 유입 로그 (최신 50건)</h4>
+              <button type="button" class="btn-refresh-list" onclick="loadAdminAnalytics()">로그 갱신</button>
+            </div>
+            <div class="admin-user-table-wrap">
+              <table class="admin-user-table admin-wide-table">
+                <thead>
+                  <tr>
+                    <th>접속 시간 (KST)</th>
+                    <th>유입 채널</th>
+                    <th>접속 IP</th>
+                    <th>기기 분류</th>
+                    <th>브라우저 / OS</th>
+                    <th>화면 해상도</th>
+                    <th>접속 URL / 리퍼러</th>
+                  </tr>
+                </thead>
+                <tbody id="adminAnalyticsLogsBody">
+                  <tr><td colspan="7" style="text-align:center;">방문자 로그 집계 중...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 탭 3: 스핀 강제 충전 & 관리 -->
+          <div class="admin-tab-panel" id="adminTabPanelRecharge" style="display:none;">
+            <div class="admin-sub-section">
+              <h4>⚡ 특정 회원 스핀 강제 충전</h4>
+              <p style="font-size:0.8rem; color:#888; margin-bottom:12px;">원하는 회원 아이디를 입력하여 테스트용 스핀을 즉시 지급하거나 무제한으로 승격시킵니다.</p>
+              <div class="admin-quick-recharge-row">
+                <input type="text" id="adminTargetUser" placeholder="회원 아이디 입력" />
+                <select id="adminAddCount">
+                  <option value="3">+3회 지급</option>
+                  <option value="5">+5회 지급</option>
+                  <option value="10">+10회 지급</option>
+                  <option value="50">+50회 지급</option>
+                  <option value="999">+무제한</option>
+                </select>
+                <button type="button" class="btn-admin-action" onclick="adminRechargeUserSpins()">스핀 지급</button>
+              </div>
             </div>
           </div>
         </div>
 
         <div class="admin-modal-footer">
-          <button class="btn-admin-close" onclick="closeAdminModal()">닫기</button>
+          <button type="button" class="btn-admin-close" onclick="closeAdminModal()">닫기</button>
         </div>
       </div>
     </div>
