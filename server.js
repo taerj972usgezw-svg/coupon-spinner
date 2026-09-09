@@ -905,6 +905,12 @@ app.post('/api/admin/reset-user-spins', (req, res) => {
 
     logger.info(`👑 관리자가 ${target.username}의 스핀을 ${target.remainingSpins}회로 변경함`);
     res.json({ success: true, message: `${target.username}님의 스핀이 ${target.remainingSpins}회로 충전되었습니다!` });
+  } catch (e) {
+    logger.error('스핀 충전 실패:', e);
+    res.status(500).json({ error: '충전 실패' });
+  }
+});
+
 // 9) 20,000원 스핀 충전 API (모의 간편결제 시스템)
 app.post('/api/spin/recharge', (req, res) => {
   try {
